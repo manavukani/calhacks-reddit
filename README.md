@@ -34,7 +34,7 @@ ThreadSense transforms chaotic Reddit discussions into actionable insights with 
 - Node.js 18+
 - Anthropic API key ([get one here](https://console.anthropic.com/))
 
-### Installation
+### Installation Mac
 
 1. **Clone and setup backend:**
 ```bash
@@ -55,6 +55,22 @@ npm install
 # Edit .env file with your Anthropic API key
 API_PROVIDER=anthropic
 ANTHROPIC_API_KEY=your-key-here
+```
+### Installation Windows
+
+1. **Frontend**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+2. **Backend**
+
+```bash
+pip install fastapi uvicorn httpx python-dotenv
+python -m uvicorn main:app --reload --port 8000
 ```
 
 ### Running the Application
