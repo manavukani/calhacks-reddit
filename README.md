@@ -100,7 +100,7 @@ npm run dev
 3. Compare sentiment, toxicity, and controversy side-by-side
 
 **Example Threads to Try:**
-- https://www.reddit.com/r/AskReddit/comments/1ofcgqw/
+- https://www.reddit.com/r/AskReddit/comments/js8e1z/
 - https://www.reddit.com/r/technology/comments/...
 - Any public Reddit discussion!
 

@@ -28,7 +28,7 @@ export default function Compare() {
 
   const tryExamples = () => {
     setUrls([
-      'https://www.reddit.com/r/AskReddit/comments/1ofcgqw/',
+      'https://www.reddit.com/r/AskReddit/comments/js8e1z',
       'https://www.reddit.com/r/technology/comments/1ofd9k8/'
     ]);
     setError("");

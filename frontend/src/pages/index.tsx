@@ -154,7 +154,7 @@ export default function Home() {
           <div className="flex flex-wrap gap-2">
             <span className="text-xs text-gray-600 font-medium">Try an example:</span>
             <button 
-              onClick={() => tryExample('https://www.reddit.com/r/AskReddit/comments/1ofcgqw/')}
+              onClick={() => tryExample('https://www.reddit.com/r/AskReddit/comments/js8e1z/')}
               className="text-xs text-[#FF4500] hover:underline font-medium"
             >
               Popular AskReddit
