@@ -8,13 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Configuration
-API_PROVIDER = os.getenv("API_PROVIDER", "janitorai")
-
-# Janitor AI (Cal Hacks)
-JANITOR_API_KEY = os.getenv("JANITOR_API_KEY")
-JANITOR_API_BASE = os.getenv("JANITOR_API_BASE", "https://janitorai.com/hackathon")
-
+API_PROVIDER = os.getenv("API_PROVIDER")
 # Anthropic Claude
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
@@ -44,7 +38,7 @@ def reddit_json_url(thread_url: str) -> str:
 async def fetch_reddit_comments(thread_url: str) -> List[str]:
     """Path A: scrape public JSON without OAuth (hackathon-fast)."""
     # Demo mode: return mock comments for testing
-    if not JANITOR_API_KEY and not ANTHROPIC_API_KEY:
+    if not ANTHROPIC_API_KEY:
         return generate_mock_comments()
     
     url = reddit_json_url(thread_url)
@@ -146,85 +140,19 @@ def build_analysis_prompt(comments: List[str]) -> List[Dict[str, str]]:
 async def claude_chat(messages: List[Dict[str,str]], max_tokens: int = 250) -> str:
     """Main AI chat function - supports multiple providers"""
     # Demo mode: return mock responses when no API key is provided
-    if not JANITOR_API_KEY and not ANTHROPIC_API_KEY and not OPENAI_API_KEY:
+    if not ANTHROPIC_API_KEY and not OPENAI_API_KEY:
         return generate_mock_response(messages)
     
     # Route to appropriate API based on provider
-    if API_PROVIDER == "janitorai" and JANITOR_API_KEY:
-        return await call_janitor_api(messages, max_tokens)
-    elif API_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
+    if API_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
         return await call_anthropic_api(messages, max_tokens)
     elif API_PROVIDER == "openai" and OPENAI_API_KEY:
         return await call_openai_api(messages, max_tokens)
     elif API_PROVIDER == "gemini" and GEMINI_API_KEY:
         return await call_gemini_api(messages, max_tokens)
     else:
-        # Fallback to Janitor AI if available
-        if JANITOR_API_KEY:
-            return await call_janitor_api(messages, max_tokens)
         # Or demo mode
         return generate_mock_response(messages)
-
-async def call_janitor_api(messages: List[Dict[str,str]], max_tokens: int) -> str:
-    """Call Janitor AI API (Cal Hacks Hackathon) - OpenAI-compatible with streaming"""
-    payload = {
-        "model": "x2",  # Can be anything, Janitor overwrites this
-        "messages": messages,
-        "temperature": 0.3,
-        "max_tokens": max_tokens,
-        "stream": False  # Request non-streaming response
-    }
-    headers = {
-        "Authorization": JANITOR_API_KEY,
-        "Content-Type": "application/json"
-    }
-    async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(f"{JANITOR_API_BASE}/completions", headers=headers, json=payload)
-        if r.status_code != 200:
-            print(f"Janitor AI Error ({r.status_code}): {r.text}")
-            raise HTTPException(status_code=502, detail=f"Janitor AI error: {r.status_code} - {r.text[:200]}")
-        
-        response_text = r.text
-        print(f"Janitor AI Raw Response: {response_text[:500]}")
-        
-        # Check if it's a streaming response (SSE format)
-        if response_text.startswith("data:"):
-            # Parse SSE streaming response
-            full_content = ""
-            for line in response_text.split("\n"):
-                line = line.strip()
-                if line.startswith("data:") and "DONE" not in line:
-                    try:
-                        json_str = line[5:].strip()  # Remove "data:" prefix
-                        if not json_str:  # Skip empty data lines
-                            continue
-                        chunk = json.loads(json_str)
-                        # Handle different response formats
-                        if "content" in chunk:
-                            full_content += chunk["content"]
-                        elif "choices" in chunk and len(chunk["choices"]) > 0:
-                            delta = chunk["choices"][0].get("delta", {})
-                            if "content" in delta:
-                                full_content += delta["content"]
-                            # Also check message.content for non-streaming format
-                            msg = chunk["choices"][0].get("message", {})
-                            if "content" in msg:
-                                full_content += msg["content"]
-                    except json.JSONDecodeError:
-                        continue
-                    except Exception as e:
-                        print(f"Error parsing chunk: {e}")
-                        continue
-            return full_content.strip() if full_content else "No content received from Janitor AI"
-        else:
-            # Try parsing as regular JSON
-            try:
-                data = r.json()
-                return data["choices"][0]["message"]["content"]
-            except Exception as e:
-                print(f"Janitor AI Response parsing error: {e}")
-                print(f"Response text: {response_text[:500]}")
-                return response_text if response_text else "Error: Empty response from Janitor AI"
 
 async def call_openai_api(messages: List[Dict[str,str]], max_tokens: int) -> str:
     """Call OpenAI API"""
@@ -331,16 +259,13 @@ def generate_mock_response(messages: List[Dict[str,str]]) -> str:
 @app.get("/health")
 async def health():
     active_key = None
-    if API_PROVIDER == "janitorai" and JANITOR_API_KEY:
-        active_key = JANITOR_API_KEY[:10] if len(JANITOR_API_KEY) > 10 else JANITOR_API_KEY
-    elif API_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
+    if API_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
         active_key = ANTHROPIC_API_KEY[:10]
     
     return {
         "ok": True, 
         "time": time.time(),
         "api_provider": API_PROVIDER,
-        "has_janitor_key": bool(JANITOR_API_KEY),
         "has_anthropic_key": bool(ANTHROPIC_API_KEY),
         "key_prefix": active_key
     }
