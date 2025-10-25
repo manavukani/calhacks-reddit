@@ -1,0 +1,9 @@
+# Requirements for backend (FastAPI service)
+# Install with: pip install -r backend/requirements.txt
+
+fastapi>=0.95.0
+uvicorn[standard]>=0.20.0
+httpx>=0.24.0
+python-dotenv>=1.0.0
+# Optional / helpful
+typing-extensions>=4.0.0

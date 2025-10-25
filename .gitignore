@@ -1,0 +1,6 @@
+.env
+.env.backup
+.rules
+.venv
+**/node_modules/
+**/.next/
