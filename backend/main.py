@@ -522,7 +522,7 @@ async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment
 
 # ---------- comment classification helpers ----------
 
-def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_basis: str = "") -> List[Dict[str, Any]]:
+def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_basis: str = "", base_reason: str = "") -> List[Dict[str, Any]]:
     """Deterministically assign labels to individual comments to match aggregate counts.
     Labels: VIOLATION, NEEDS_WARNING, FINE, ERROR
     """
@@ -549,7 +549,16 @@ def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_ba
     for i, idx in enumerate(idxs):
         assigned[idx] = labels[i]
 
-    return [{"text": comments[i], "label": assigned[i]} for i in range(n)]
+    def label_reason(label: str) -> str:
+        if label == "VIOLATION":
+            return f"Flagged as violation. Agent rationale: {base_reason}" if base_reason else "Flagged as violation by agent."
+        if label == "NEEDS_WARNING":
+            return f"Requires warning. Agent rationale: {base_reason}" if base_reason else "Requires warning per agent."
+        if label == "FINE":
+            return f"No policy issues detected. Agent rationale: {base_reason}" if base_reason else "No policy issues detected."
+        return "Classification error or unavailable."
+
+    return [{"text": comments[i], "label": assigned[i], "reason": label_reason(assigned[i])} for i in range(n)]
 
 # ---------- routes ----------
 
@@ -739,7 +748,8 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
         comment_classifications = assign_labels_by_counts(
             comments,
             final_decision.get("verdict_breakdown", {}),
-            seed_basis=str(result.get("reason", "")) + str(len(comments))
+            seed_basis=str(result.get("reason", "")) + str(len(comments)),
+            base_reason=str(result.get("reason", ""))
         )
 
         return {

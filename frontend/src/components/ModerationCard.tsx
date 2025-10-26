@@ -184,30 +184,30 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
               Comment Analysis
             </button>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-              <div className="flex justify-between">
+              <div className="flex gap-2">
                 <span className="text-red-600">Violations:</span>
                 <span className="font-semibold">{result.final_decision.verdict_breakdown.VIOLATION}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex gap-2">
                 <span className="text-yellow-600">Warnings:</span>
                 <span className="font-semibold">{result.final_decision.verdict_breakdown.NEEDS_WARNING}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex gap-2">
                 <span className="text-green-600">Clean:</span>
                 <span className="font-semibold">{result.final_decision.verdict_breakdown.FINE}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex gap-2">
                 <span className="text-gray-600">Errors:</span>
                 <span className="font-semibold">{result.final_decision.verdict_breakdown.ERROR}</span>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-300">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between">
+                <div className="flex gap-2">
                   <span className="text-gray-600">Subreddit Detected:</span>
                   <span className="font-semibold">r/{result.detected_subreddit}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex gap-2">
                   <span className="text-gray-600">Agent Used:</span>
                   <span className="font-semibold">r/{result.agent_used}</span>
                 </div>
@@ -262,7 +262,12 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               <li className="text-gray-500">No violating comments detected.</li>
                             ) : (
                               violations.map((c, i) => (
-                                <li key={`v-${i}`} className="p-2 rounded border border-red-200 bg-red-50 text-red-900">{c.text}</li>
+                                <li key={`v-${i}`} className="p-2 rounded border border-red-200 bg-red-50">
+                                  <p className="text-red-900">{c.text}</p>
+                                  {('reason' in c) && (
+                                    <p className="mt-1 text-xs text-red-700">{(c as any).reason}</p>
+                                  )}
+                                </li>
                               ))
                             )}
                           </ul>
@@ -274,7 +279,12 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               <li className="text-gray-500">No comments requiring warnings.</li>
                             ) : (
                               warnings.map((c, i) => (
-                                <li key={`w-${i}`} className="p-2 rounded border border-yellow-200 bg-yellow-50 text-yellow-900">{c.text}</li>
+                                <li key={`w-${i}`} className="p-2 rounded border border-yellow-200 bg-yellow-50">
+                                  <p className="text-yellow-900">{c.text}</p>
+                                  {('reason' in c) && (
+                                    <p className="mt-1 text-xs text-yellow-700">{(c as any).reason}</p>
+                                  )}
+                                </li>
                               ))
                             )}
                           </ul>
@@ -286,7 +296,12 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               <li className="text-gray-500">No clean comments identified.</li>
                             ) : (
                               clean.map((c, i) => (
-                                <li key={`c-${i}`} className="p-2 rounded border border-green-200 bg-green-50 text-green-900">{c.text}</li>
+                                <li key={`c-${i}`} className="p-2 rounded border border-green-200 bg-green-50">
+                                  <p className="text-green-900">{c.text}</p>
+                                  {('reason' in c) && (
+                                    <p className="mt-1 text-xs text-green-700">{(c as any).reason}</p>
+                                  )}
+                                </li>
                               ))
                             )}
                           </ul>
@@ -298,7 +313,12 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               <li className="text-gray-500">No errors reported.</li>
                             ) : (
                               errors.map((c, i) => (
-                                <li key={`e-${i}`} className="p-2 rounded border border-gray-200 bg-gray-50 text-gray-900">{c.text}</li>
+                                <li key={`e-${i}`} className="p-2 rounded border border-gray-200 bg-gray-50">
+                                  <p className="text-gray-900">{c.text}</p>
+                                  {('reason' in c) && (
+                                    <p className="mt-1 text-xs text-gray-600">{(c as any).reason}</p>
+                                  )}
+                                </li>
                               ))
                             )}
                           </ul>
