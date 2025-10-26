@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Plus, UserPlus, ChevronDown, Flame, Clock4, ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, Target } from 'lucide-react'
+import { Plus, UserPlus, ChevronDown, Flame, Clock4, ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, Target, X } from 'lucide-react'
 
 const ALLOWED = new Set(['worldnews', 'askreddit', 'science', 'askhistorians'])
 const BACKEND = 'http://localhost:8000'
@@ -17,6 +17,9 @@ export default function SubredditPage() {
   const [error, setError] = useState<string | null>(null)
   const [overview, setOverview] = useState('')
   const [posts, setPosts] = useState<any[]>([])
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [chatInput, setChatInput] = useState('')
 
   useEffect(() => {
     if (!key || !allowed) return
@@ -146,6 +149,25 @@ export default function SubredditPage() {
             className="relative rounded-xl bg-white p-5 drop-shadow-[0_10px_13px_rgba(255,69,0,0.06)] shadow-[0_20px_25px_-5px_rgba(255,69,0,0.1)] border border-gray-200"
           >
             <div className="text-lg font-semibold mb-2">What’s going on?</div>
+            <div className="absolute top-3 right-3">
+              <button
+                onClick={() => {
+                  setChatMessages([
+                    {
+                      role: 'assistant',
+                      content:
+                        overview
+                          ? `I know the current summary for r/${key}. Ask me anything about it, or request clarifications and follow-ups.`
+                          : `I don't have a summary for r/${key} yet, but feel free to ask questions.`,
+                    },
+                  ])
+                  setChatOpen(true)
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-gray-300 bg-white hover:bg-gray-50"
+              >
+                <MessageSquare className="w-4 h-4" /> Chat
+              </button>
+            </div>
             {loading ? (
               <div className="animate-pulse space-y-2">
                 <div className="h-4 w-5/6 bg-gray-200 rounded" />
@@ -292,6 +314,59 @@ export default function SubredditPage() {
           </div>
         </aside>
       </div>
+      {chatOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setChatOpen(false)} />
+          <div className="relative z-10 w-full max-w-lg mx-4 rounded-xl border border-gray-200 bg-white shadow-xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div className="font-semibold text-sm">Chat about r/{key}</div>
+              <button onClick={() => setChatOpen(false)} className="p-1 rounded hover:bg-gray-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto flex-1">
+              {chatMessages.map((m, i) => (
+                <div key={i} className={m.role === 'assistant' ? 'text-sm text-gray-800' : 'text-sm text-gray-900'}>
+                  <div className={m.role === 'assistant' ? 'bg-gray-100 rounded-lg p-3' : 'bg-orange-50 rounded-lg p-3'}>{m.content}</div>
+                </div>
+              ))}
+              {chatMessages.length === 0 && (
+                <div className="text-xs text-gray-500">Start by asking a question about what’s going on in this subreddit.</div>
+              )}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const text = chatInput.trim()
+                if (!text) return
+                const userMsg = { role: 'user' as const, content: text }
+                const assistantReply = (() => {
+                  const base = overview || ''
+                  if (!base) return "I don't have a summary yet. Try reloading or asking something general."
+                  const lower = text.toLowerCase()
+                  if (lower.includes('summary') || lower.includes('what') || lower.includes('happening')) {
+                    return base
+                  }
+                  return `${base}\n\nFrom that, here is a short take: ${text.length > 140 ? text.slice(0, 140) + '…' : text}.`
+                })()
+                setChatMessages((prev) => [...prev, userMsg, { role: 'assistant', content: assistantReply }])
+                setChatInput('')
+              }}
+              className="border-t border-gray-200 p-3 flex items-center gap-2"
+            >
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask about the summary…"
+                className="flex-1 text-sm px-3 py-2 rounded-md border border-gray-300 outline-none focus:ring-2 focus:ring-orange-200"
+              />
+              <button type="submit" className="px-3 py-2 rounded-md bg-[#FF4500] text-white text-sm font-semibold hover:bg-[#ff5722]">
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
