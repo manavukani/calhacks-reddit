@@ -786,7 +786,7 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
         result = await moderate_with_agent(client, agent_id, thread_text, agent_subreddit)
         moderation_results = [result]
         try:
-            client.blocks.update(
+            client.blocks.modify(
                 block_id=shared_memory.id,
                 value=json.dumps(moderation_results)
             )
