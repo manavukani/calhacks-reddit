@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Plus, UserPlus, ChevronDown, Flame, Clock4, ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark } from 'lucide-react'
+import { Plus, UserPlus, ChevronDown, Flame, Clock4, ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, Target } from 'lucide-react'
 
 const ALLOWED = new Set(['worldnews', 'askreddit', 'science', 'askhistorians'])
 const BACKEND = 'http://localhost:8000'
@@ -78,7 +78,10 @@ export default function SubredditPage() {
       <div className="fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#FF4500] rounded-full" />
+            <div className="w-8 h-8 bg-[#FF4500] rounded-full flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-gray-900 hidden sm:inline">Reddit:AI</span>
           </Link>
           <div className="hidden md:flex items-center flex-1">
             <div className="w-full max-w-xl">

@@ -2,7 +2,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useMemo, useEffect, useState } from 'react'
-import { ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, Flame, ChevronDown } from 'lucide-react'
+import { ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, Flame, ChevronDown, Target } from 'lucide-react'
 
 const BACKEND = 'http://localhost:8000'
 
@@ -141,7 +141,10 @@ export default function ThreadPage() {
       <div className="fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
           <Link href={`/`} className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#FF4500] rounded-full" />
+            <div className="w-8 h-8 bg-[#FF4500] rounded-full flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-gray-900 hidden sm:inline">Reddit:AI</span>
           </Link>
           <div className="hidden md:flex items-center flex-1">
             <div className="w-full max-w-xl">
