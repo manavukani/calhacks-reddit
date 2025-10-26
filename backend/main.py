@@ -128,7 +128,7 @@ def generate_mock_comments() -> List[str]:
 def build_summary_prompt(comments: List[str]) -> List[Dict[str, str]]:
     text = "\n\n".join(f"- {c}" for c in comments[:150])
     system = (
-        "You are ThreadSense, summarizing a Reddit discussion for a group.\n"
+        "You are Reddit:AI, summarizing a Reddit discussion for a group.\n"
         "Output 3 concise sentences capturing: (1) main viewpoints, "
         "(2) any consensus/conflict, (3) overall tone. No usernames. No quotes."
     )

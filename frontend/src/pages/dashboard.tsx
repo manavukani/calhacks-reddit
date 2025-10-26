@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { MessageSquare, TrendingUp, AlertTriangle, Users, Target, Flame, Clock } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useRouter } from 'next/router';
+import { MessageSquare, TrendingUp, AlertTriangle, Users, Target, Flame, Clock, ArrowLeft } from 'lucide-react';
 import SentimentGauge from '../components/SentimentGauge';
 import KeywordCloud from '../components/KeywordCloud';
 import EmotionChart from '../components/EmotionChart';
@@ -8,17 +9,31 @@ import ExportButton from '../components/ExportButton';
 import ModerationCard from '../components/ModerationCard';
 
 export default function Dashboard() {
+  const router = useRouter();
   const [url, setUrl] = useState("");
   const [summary, setSummary] = useState<string>("");
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [count, setCount] = useState(0);
   const [error, setError] = useState<string>("");
+  const [backUrl, setBackUrl] = useState<string>("");
   
   // Moderation state
   const [moderationLoading, setModerationLoading] = useState(false);
   const [moderationResult, setModerationResult] = useState<any>(null);
   const [moderationError, setModerationError] = useState<string>("");
+
+  // Auto-fill URL from query parameter and store back URL
+  useEffect(() => {
+    if (router.isReady && router.query.url) {
+      const urlParam = router.query.url as string;
+      setUrl(urlParam);
+    }
+    if (router.isReady && router.query.from) {
+      const fromParam = router.query.from as string;
+      setBackUrl(fromParam);
+    }
+  }, [router.isReady, router.query.url, router.query.from]);
 
   const tryExample = (exampleUrl: string) => {
     setUrl(exampleUrl);
@@ -152,20 +167,29 @@ export default function Dashboard() {
                 <Target className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">ThreadSense</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Reddit:AI</h1>
                 <p className="text-sm text-gray-600">AI-Powered Reddit Analysis</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <a href="/history" className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-full transition font-semibold flex items-center gap-1">
+              {backUrl ? (
+                <a href={backUrl} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-full transition font-semibold flex items-center gap-1">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Thread
+                </a>
+              ) : (
+                <>
+                  <a href="/" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
+                    Simple View
+                  </a>
+                  <a href="/compare" className="px-4 py-2 text-sm bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">
+                    Compare
+                  </a>
+                </>
+              )}
+              <a href={backUrl ? `/history?from=${encodeURIComponent(backUrl)}` : '/history'} className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold flex items-center gap-1">
                 <Clock className="w-4 h-4" />
                 History
-              </a>
-              <a href="/" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
-                Simple View
-              </a>
-              <a href="/compare" className="px-4 py-2 text-sm bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">
-                Compare
               </a>
             </div>
           </div>

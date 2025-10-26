@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Clock, Trash2, ExternalLink, TrendingUp, Target } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { Clock, Trash2, ExternalLink, TrendingUp, Target, ArrowLeft } from 'lucide-react';
 
 interface HistoryItem {
   id: string;
@@ -11,11 +12,20 @@ interface HistoryItem {
 }
 
 export default function History() {
+  const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [backUrl, setBackUrl] = useState<string>("");
 
   useEffect(() => {
     loadHistory();
   }, []);
+
+  useEffect(() => {
+    if (router.isReady && router.query.from) {
+      const fromParam = router.query.from as string;
+      setBackUrl(fromParam);
+    }
+  }, [router.isReady, router.query.from]);
 
   const loadHistory = () => {
     const stored = localStorage.getItem('threadsense_history');
@@ -81,12 +91,21 @@ export default function History() {
               </div>
             </div>
             <div className="flex gap-2">
-              <a href="/" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
-                Simple View
-              </a>
-              <a href="/dashboard" className="px-4 py-2 text-sm bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">
-                Dashboard
-              </a>
+              {backUrl ? (
+                <a href={backUrl} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-full transition font-semibold flex items-center gap-1">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Thread
+                </a>
+              ) : (
+                <>
+                  <a href="/" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
+                    Simple View
+                  </a>
+                  <a href="/compare" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
+                    Compare
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </div>

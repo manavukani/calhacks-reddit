@@ -195,7 +195,10 @@ export default function ThreadPage() {
                 </div>
                 {/* Content */}
                 <div className="flex-1 p-4">
-                  <Link href="/dashboard" className="absolute top-3 right-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FF4500] text-white text-sm font-semibold hover:bg-[#ff5722]">
+                  <Link 
+                    href={`/dashboard?url=${encodeURIComponent(post.url)}&from=${encodeURIComponent(`/r/${post.subreddit}/comments/${post.id}/${encodeURIComponent(post.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').substring(0, 100))}`)}`}
+                    className="absolute top-3 right-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FF4500] text-white text-sm font-semibold hover:bg-[#ff5722]"
+                  >
                     Analyze
                   </Link>
                   <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">

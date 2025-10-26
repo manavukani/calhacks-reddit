@@ -118,7 +118,7 @@ export default function APIPage() {
               <div className="w-10 h-10 bg-[#FF4500] rounded-full flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">ThreadSense API</span>
+              <span className="text-xl font-bold text-gray-900">Reddit:AI API</span>
             </div>
             <div className="flex items-center gap-4">
               <a href="/" className="text-gray-700 hover:text-[#FF4500] transition">Home</a>
@@ -139,7 +139,7 @@ export default function APIPage() {
           </div>
           <h1 className="text-5xl font-bold mb-4">Powerful Reddit Intelligence API</h1>
           <p className="text-xl opacity-90 mb-8">
-            Integrate ThreadSense into your workflow with our simple REST API
+            Integrate Reddit:AI into your workflow with our simple REST API
           </p>
           <div className="flex items-center justify-center gap-4">
             <a href="#endpoints" className="px-6 py-3 bg-white text-[#FF4500] rounded-full hover:bg-gray-100 transition font-bold">
@@ -295,7 +295,7 @@ export default function APIPage() {
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12 px-6">
         <div className="max-w-7xl mx-auto text-center">
-          <p className="text-gray-400">© 2025 ThreadSense API. Built for developers.</p>
+          <p className="text-gray-400">© 2025 Reddit:AI API. Built for developers.</p>
         </div>
       </footer>
     </div>

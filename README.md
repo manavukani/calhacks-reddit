@@ -1,8 +1,8 @@
-# 🎯 ThreadSense
+# 🎯 Reddit:AI
 
 > **AI-Powered Reddit Intelligence Platform for Cal Hacks 12.0**
 
-ThreadSense transforms chaotic Reddit discussions into actionable insights with advanced sentiment analysis, emotion detection, toxicity scoring, and multi-thread comparison. Built for moderators, researchers, and brands who need instant Reddit intelligence.
+Reddit:AI transforms chaotic Reddit discussions into actionable insights with advanced sentiment analysis, emotion detection, toxicity scoring, and multi-thread comparison. Built for moderators, researchers, and brands who need instant Reddit intelligence.
 
 ## ✨ Features
 

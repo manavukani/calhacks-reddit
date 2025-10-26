@@ -22,7 +22,7 @@ export default function Landing() {
               <div className="w-10 h-10 bg-[#FF4500] rounded-full flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">ThreadSense</span>
+              <span className="text-xl font-bold text-gray-900">Reddit:AI</span>
             </div>
             <div className="flex items-center gap-6">
               <a href="#features" className="text-gray-700 hover:text-[#FF4500] transition">Features</a>
@@ -356,7 +356,7 @@ export default function Landing() {
         <div className="max-w-4xl mx-auto text-center text-white">
           <h2 className="text-4xl font-bold mb-4">Ready to Make Sense of Reddit?</h2>
           <p className="text-xl mb-8 opacity-90">
-            Join hundreds of moderators, researchers, and brands using ThreadSense
+            Join hundreds of moderators, researchers, and brands using Reddit:AI
           </p>
           <div className="flex items-center justify-center gap-4">
             <a href="/dashboard" className="px-8 py-4 bg-white text-[#FF4500] rounded-full hover:bg-gray-100 transition font-bold text-lg">
@@ -375,7 +375,7 @@ export default function Landing() {
                 <div className="w-8 h-8 bg-[#FF4500] rounded-full flex items-center justify-center">
                   <Target className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-bold">ThreadSense</span>
+                <span className="font-bold">Reddit:AI</span>
               </div>
               <p className="text-gray-400 text-sm">AI-powered Reddit intelligence for everyone.</p>
             </div>
@@ -407,7 +407,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
-            <p>© 2025 ThreadSense. Built for Cal Hacks 12.0 🚀</p>
+            <p>© 2025 Reddit:AI. Built for Cal Hacks 12.0 🚀</p>
           </div>
         </div>
       </footer>

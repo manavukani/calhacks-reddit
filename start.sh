@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Starting ThreadSense Application"
+echo "🚀 Starting Reddit:AI Application"
 echo "=================================="
 
 # Check if virtual environment exists

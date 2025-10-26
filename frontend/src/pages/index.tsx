@@ -69,7 +69,7 @@ export default function Home() {
               <div className="w-10 h-10 bg-[#FF4500] rounded-full flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bold text-gray-900 text-xl">ThreadSense</span>
+              <span className="font-bold text-gray-900 text-xl">Reddit:AI</span>
             </div>
             <div className="flex gap-2">
               <a href="/dashboard" className="px-4 py-2 text-sm bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">
@@ -86,7 +86,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">ThreadSense</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Reddit:AI</h1>
           <p className="text-lg text-gray-600 mb-4">AI-powered Reddit thread analysis in seconds</p>
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
             <div className="flex items-center gap-1">
