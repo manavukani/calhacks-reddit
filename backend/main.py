@@ -26,7 +26,7 @@ LETTA_AGENTS = {
     "askreddit": "agent-ab2acbb6-d500-4831-b0d1-4e68a3fb0bb0", 
     "science": "agent-5a976cf5-a506-4232-b6ca-eb4f7a2fa450",
     "askhistorians": "agent-4c1e7105-9cf7-4104-92ef-cfbd5b8ff89d",
-    "general_agent": "agent-c87c61a9-16a1-4a3b-9fdb-90bc015da842"
+    "general": "agent-c87c61a9-16a1-4a3b-9fdb-90bc015da842"
 }
 
 app = FastAPI()

@@ -104,7 +104,7 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
           </h3>
           {result && (
             <p className="text-sm text-gray-600 mt-1">
-              Detected: r/{result.detected_subreddit} → Using: r/{result.agent_used} agent
+              Detected: r/{result.detected_subreddit} → Using: {result.agent_used} agent
             </p>
           )}
         </div>
