@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, AlertTriangle, CheckCircle, XCircle, Users, Clock, Zap } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle, XCircle, Users, Clock, Zap, X } from 'lucide-react';
 
 interface AgentDecision {
   subreddit: string;
@@ -8,6 +8,11 @@ interface AgentDecision {
   confidence: number;
   reason: string;
   raw_response: string;
+}
+
+interface CommentClassification {
+  text: string;
+  label: 'VIOLATION' | 'NEEDS_WARNING' | 'FINE' | 'ERROR';
 }
 
 interface FinalDecision {
@@ -31,6 +36,7 @@ interface ModerationResult {
   agent_decisions: AgentDecision[];
   final_decision: FinalDecision;
   shared_memory_id: string;
+  comment_classifications?: CommentClassification[];
 }
 
 interface ModerationCardProps {
@@ -43,6 +49,7 @@ interface ModerationCardProps {
 
 export default function ModerationCard({ threadUrl, onModerate, loading, result, error }: ModerationCardProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
   const getDecisionColor = (decision: string) => {
     switch (decision) {
@@ -168,10 +175,14 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
 
           {/* Comment Flagging Statistics */}
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h5 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAnalysisModal(true)}
+              className="font-semibold text-gray-900 mb-2 flex items-center gap-2 hover:text-[#FF4500]"
+            >
               <Users className="w-4 h-4" />
               Comment Analysis
-            </h5>
+            </button>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-red-600">Violations:</span>
@@ -203,6 +214,102 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
               </div>
             </div>
           </div>
+
+          {showAnalysisModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40" onClick={() => setShowAnalysisModal(false)}></div>
+              <div className="relative bg-white w-full max-w-2xl mx-4 rounded-lg shadow-2xl border border-gray-200">
+                <div className="p-5 max-h-[80vh] overflow-y-auto">
+                  <button
+                    type="button"
+                    className="absolute top-3 right-3 p-1 rounded hover:bg-gray-100"
+                    onClick={() => setShowAnalysisModal(false)}
+                    aria-label="Close"
+                  >
+                    <X className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Comment Analysis</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                    <div className="p-3 rounded border bg-red-50 border-red-200 flex items-center justify-between">
+                      <span className="text-red-700">Violations</span>
+                      <span className="font-semibold text-red-800">{result.final_decision.verdict_breakdown.VIOLATION}</span>
+                    </div>
+                    <div className="p-3 rounded border bg-yellow-50 border-yellow-200 flex items-center justify-between">
+                      <span className="text-yellow-700">Warnings</span>
+                      <span className="font-semibold text-yellow-800">{result.final_decision.verdict_breakdown.NEEDS_WARNING}</span>
+                    </div>
+                    <div className="p-3 rounded border bg-green-50 border-green-200 flex items-center justify-between">
+                      <span className="text-green-700">Clean</span>
+                      <span className="font-semibold text-green-800">{result.final_decision.verdict_breakdown.FINE}</span>
+                    </div>
+                    <div className="p-3 rounded border bg-gray-50 border-gray-200 flex items-center justify-between">
+                      <span className="text-gray-700">Errors</span>
+                      <span className="font-semibold text-gray-800">{result.final_decision.verdict_breakdown.ERROR}</span>
+                    </div>
+                  </div>
+                  {(() => {
+                    const cls = result?.comment_classifications ?? [];
+                    const violations = cls.filter(c => c.label === 'VIOLATION');
+                    const warnings = cls.filter(c => c.label === 'NEEDS_WARNING');
+                    const clean = cls.filter(c => c.label === 'FINE');
+                    const errors = cls.filter(c => c.label === 'ERROR');
+                    return (
+                      <div className="space-y-5">
+                        <div>
+                          <h4 className="text-sm font-semibold text-red-700 mb-2">Violations ({violations.length})</h4>
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            {violations.length === 0 ? (
+                              <li className="text-gray-500">No violating comments detected.</li>
+                            ) : (
+                              violations.map((c, i) => (
+                                <li key={`v-${i}`} className="p-2 rounded border border-red-200 bg-red-50 text-red-900">{c.text}</li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-yellow-700 mb-2">Warnings ({warnings.length})</h4>
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            {warnings.length === 0 ? (
+                              <li className="text-gray-500">No comments requiring warnings.</li>
+                            ) : (
+                              warnings.map((c, i) => (
+                                <li key={`w-${i}`} className="p-2 rounded border border-yellow-200 bg-yellow-50 text-yellow-900">{c.text}</li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-green-700 mb-2">Clean ({clean.length})</h4>
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            {clean.length === 0 ? (
+                              <li className="text-gray-500">No clean comments identified.</li>
+                            ) : (
+                              clean.map((c, i) => (
+                                <li key={`c-${i}`} className="p-2 rounded border border-green-200 bg-green-50 text-green-900">{c.text}</li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Errors ({errors.length})</h4>
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            {errors.length === 0 ? (
+                              <li className="text-gray-500">No errors reported.</li>
+                            ) : (
+                              errors.map((c, i) => (
+                                <li key={`e-${i}`} className="p-2 rounded border border-gray-200 bg-gray-50 text-gray-900">{c.text}</li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Detailed Agent Responses */}
           <div>

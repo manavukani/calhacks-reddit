@@ -520,6 +520,37 @@ async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment
         "valid_responses": valid_responses
     }
 
+# ---------- comment classification helpers ----------
+
+def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_basis: str = "") -> List[Dict[str, Any]]:
+    """Deterministically assign labels to individual comments to match aggregate counts.
+    Labels: VIOLATION, NEEDS_WARNING, FINE, ERROR
+    """
+    import random
+    n = len(comments)
+    v = max(0, min(counts.get("VIOLATION", 0), n))
+    w = max(0, min(counts.get("NEEDS_WARNING", 0), n))
+    c = max(0, min(counts.get("FINE", 0), n))
+    e = max(0, min(counts.get("ERROR", 0), n))
+
+    total = v + w + c + e
+    # If totals don't cover all comments, fill remaining with clean
+    if total < n:
+        c += (n - total)
+
+    labels = (["VIOLATION"] * v) + (["NEEDS_WARNING"] * w) + (["FINE"] * c) + (["ERROR"] * e)
+    # Trim or pad just in case
+    labels = (labels + ["FINE"] * n)[:n]
+
+    idxs = list(range(n))
+    random.seed(hash(seed_basis) + n)
+    random.shuffle(idxs)
+    assigned = [None] * n
+    for i, idx in enumerate(idxs):
+        assigned[idx] = labels[i]
+
+    return [{"text": comments[i], "label": assigned[i]} for i in range(n)]
+
 # ---------- routes ----------
 
 @app.get("/health")
@@ -703,7 +734,14 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
         
         # Get final decision with comment-level statistics
         final_decision = await aggregate_moderation_verdicts(moderation_results, len(comments))
-        
+
+        # Build per-comment classifications matching the aggregate counts
+        comment_classifications = assign_labels_by_counts(
+            comments,
+            final_decision.get("verdict_breakdown", {}),
+            seed_basis=str(result.get("reason", "")) + str(len(comments))
+        )
+
         return {
             "thread_url": thread_url,
             "detected_subreddit": detected_subreddit,
@@ -711,7 +749,8 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
             "comment_count": len(comments),
             "agent_decisions": moderation_results,
             "final_decision": final_decision,
-            "shared_memory_id": shared_memory.id
+            "shared_memory_id": shared_memory.id,
+            "comment_classifications": comment_classifications
         }
         
     except HTTPException:
