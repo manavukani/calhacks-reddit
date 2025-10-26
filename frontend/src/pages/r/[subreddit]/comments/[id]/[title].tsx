@@ -1,26 +1,135 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, Flame, ChevronDown } from 'lucide-react'
+
+const BACKEND = 'http://localhost:8000'
+
+interface Comment {
+  id: string
+  author: string
+  body: string
+  score: number
+  created_utc: number
+  parent_id: string
+  depth: number
+  replies: Comment[]
+}
+
+interface Post {
+  id: string
+  title: string
+  author: string
+  score: number
+  created_utc: number
+  num_comments: number
+  selftext: string
+  subreddit: string
+  url: string
+}
+
+function CommentTree({ comment, depth = 0 }: { comment: Comment; depth?: number }) {
+  const timeAgo = comment.created_utc
+    ? (() => {
+        const seconds = Math.floor(Date.now() / 1000 - comment.created_utc)
+        const days = Math.floor(seconds / 86400)
+        const hours = Math.floor(seconds / 3600)
+        const minutes = Math.floor(seconds / 60)
+        if (days > 0) return `${days}d`
+        if (hours > 0) return `${hours}h`
+        if (minutes > 0) return `${minutes}m`
+        return 'now'
+      })()
+    : '1h'
+
+  return (
+    <div className={depth > 0 ? 'ml-4 border-l-2 border-gray-200 pl-3' : ''}>
+      <div className="rounded-lg border border-gray-200 bg-white p-3 mb-2">
+        <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+          <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-semibold text-orange-600">
+            {comment.author?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <span className="font-medium">u/{comment.author}</span>
+          <span>•</span>
+          <span>{timeAgo}</span>
+        </div>
+        <p className="text-sm text-gray-800 mb-2 whitespace-pre-wrap">{comment.body}</p>
+        <div className="flex items-center gap-2 text-xs">
+          <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+            <ArrowBigUp className="w-4 h-4" /> {comment.score}
+          </button>
+          <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+            <ArrowBigDown className="w-4 h-4" />
+          </button>
+          <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+            <MessageSquare className="w-4 h-4" /> Reply
+          </button>
+        </div>
+      </div>
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="space-y-2">
+          {comment.replies.map((reply) => (
+            <CommentTree key={reply.id} comment={reply} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ThreadPage() {
   const router = useRouter()
   const { subreddit, id, title } = router.query
   const sub = useMemo(() => (typeof subreddit === 'string' ? subreddit.toLowerCase() : ''), [subreddit])
-  const postTitle = typeof title === 'string' ? decodeURIComponent(title) : ''
+  const postId = typeof id === 'string' ? id : ''
+  
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [post, setPost] = useState<Post | null>(null)
+  const [comments, setComments] = useState<Comment[]>([])
 
-  // Mock content/comments (can be wired later)
-  const comments = Array.from({ length: 8 }).map((_, i) => ({
-    id: i + 1,
-    author: `u-commenter${i + 1}`,
-    body:
-      i % 2 === 0
-        ? 'This is a thoughtful take. I think OP raises valid points about trade-offs.'
-        : 'Counterpoint: the premise is flawed. Consider alternative data from last year.',
-    score: 120 - i * 7,
-    age: `${i + 1}h`
-  }))
+  useEffect(() => {
+    if (!postId) return
+    let cancelled = false
+    
+    async function fetchPost() {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`${BACKEND}/api/post/${postId}`)
+        if (!res.ok) throw new Error(await res.text())
+        const data = await res.json()
+        if (!cancelled) {
+          setPost(data.post)
+          setComments(data.comments || [])
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Failed to load post')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    
+    fetchPost()
+    return () => { cancelled = true }
+  }, [postId])
+
+  const postTitle = post?.title || ''
+  const timeAgo = post?.created_utc
+    ? (() => {
+        const seconds = Math.floor(Date.now() / 1000 - post.created_utc)
+        const days = Math.floor(seconds / 86400)
+        const hours = Math.floor(seconds / 3600)
+        if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
+        if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+        return 'just now'
+      })()
+    : 'recently'
+  
+  const formattedScore = post?.score && post.score >= 1000
+    ? `${(post.score / 1000).toFixed(1)}k`
+    : post?.score || 0
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
@@ -63,41 +172,55 @@ export default function ThreadPage() {
         {/* Main column */}
         <div className="lg:col-span-2 space-y-4">
           {/* Post card */}
-          <article className="relative rounded-lg border border-gray-200 bg-white">
-            <div className="flex">
-              {/* Vote bar */}
-              <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-1 border-r border-gray-100">
-                <button aria-label="upvote" className="p-1 rounded hover:bg-gray-100"><ArrowBigUp className="w-5 h-5" /></button>
-                <div className="text-xs font-semibold">4.6k</div>
-                <button aria-label="downvote" className="p-1 rounded hover:bg-gray-100"><ArrowBigDown className="w-5 h-5" /></button>
+          {loading ? (
+            <article className="rounded-lg border border-gray-200 bg-white p-4 animate-pulse">
+              <div className="space-y-3">
+                <div className="h-6 bg-gray-200 rounded w-3/4" />
+                <div className="h-4 bg-gray-200 rounded w-1/2" />
+                <div className="h-20 bg-gray-100 rounded" />
               </div>
-              {/* Content */}
-              <div className="flex-1 p-4">
-                <Link href="/dashboard" className="absolute top-3 right-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FF4500] text-white text-sm font-semibold hover:bg-[#ff5722]">
-                  Analyze
-                </Link>
-                <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                  <div className="w-6 h-6 rounded-full bg-gray-200" />
-                  <span className="font-medium">u/exampleOP</span>
-                  <span>•</span>
-                  <span>18 days ago</span>
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Discussion</span>
+            </article>
+          ) : error ? (
+            <article className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-red-600">{error}</p>
+            </article>
+          ) : post ? (
+            <article className="relative rounded-lg border border-gray-200 bg-white">
+              <div className="flex">
+                {/* Vote bar */}
+                <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-1 border-r border-gray-100">
+                  <button aria-label="upvote" className="p-1 rounded hover:bg-gray-100"><ArrowBigUp className="w-5 h-5" /></button>
+                  <div className="text-xs font-semibold">{formattedScore}</div>
+                  <button aria-label="downvote" className="p-1 rounded hover:bg-gray-100"><ArrowBigDown className="w-5 h-5" /></button>
                 </div>
-                <h1 className="text-xl md:text-2xl font-bold mb-2">{postTitle || 'Thread title here'}</h1>
-                <div className="prose prose-sm md:prose-base max-w-none text-gray-800">
-                  <p>
-                    This is placeholder body text for the thread. Replace with the real post content when wired to your data.
-                    The layout mirrors Reddit: meta row, title, body, then action buttons.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs mt-3">
-                  <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><MessageSquare className="w-4 h-4" /> 2.4k Comments</button>
-                  <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><Share2 className="w-4 h-4" /> Share</button>
-                  <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><Bookmark className="w-4 h-4" /> Save</button>
+                {/* Content */}
+                <div className="flex-1 p-4">
+                  <Link href="/dashboard" className="absolute top-3 right-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FF4500] text-white text-sm font-semibold hover:bg-[#ff5722]">
+                    Analyze
+                  </Link>
+                  <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                    <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-semibold text-orange-600">
+                      {post.author?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                    <span className="font-medium">u/{post.author}</span>
+                    <span>•</span>
+                    <span>{timeAgo}</span>
+                  </div>
+                  <h1 className="text-xl md:text-2xl font-bold mb-2">{post.title}</h1>
+                  {post.selftext && (
+                    <div className="prose prose-sm md:prose-base max-w-none text-gray-800 mb-3">
+                      <p className="whitespace-pre-wrap">{post.selftext}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-xs mt-3">
+                    <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><MessageSquare className="w-4 h-4" /> {comments.length} Comments</button>
+                    <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><Share2 className="w-4 h-4" /> Share</button>
+                    <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><Bookmark className="w-4 h-4" /> Save</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </article>
+            </article>
+          ) : null}
 
           {/* Sort comments */}
           <div className="flex items-center gap-2 text-sm py-1">
@@ -109,22 +232,23 @@ export default function ThreadPage() {
 
           {/* Comments list */}
           <div className="space-y-3">
-            {comments.map((c) => (
-              <div key={c.id} className="rounded-lg border border-gray-200 bg-white p-3">
-                <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                  <div className="w-6 h-6 rounded-full bg-gray-200" />
-                  <span className="font-medium">{c.author}</span>
-                  <span>•</span>
-                  <span>{c.age} ago</span>
-                </div>
-                <p className="text-sm text-gray-800 mb-2">{c.body}</p>
-                <div className="flex items-center gap-2 text-xs">
-                  <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><ArrowBigUp className="w-4 h-4" /> {c.score}</button>
-                  <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><ArrowBigDown className="w-4 h-4" /></button>
-                  <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><MessageSquare className="w-4 h-4" /> Reply</button>
+            {loading ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-4 animate-pulse">
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-1/4" />
+                  <div className="h-3 bg-gray-200 rounded w-full" />
+                  <div className="h-3 bg-gray-200 rounded w-5/6" />
                 </div>
               </div>
-            ))}
+            ) : comments.length > 0 ? (
+              comments.map((comment) => (
+                <CommentTree key={comment.id} comment={comment} depth={0} />
+              ))
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+                <p className="text-gray-500">No comments yet.</p>
+              </div>
+            )}
           </div>
         </div>
 

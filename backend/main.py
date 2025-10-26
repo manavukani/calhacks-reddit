@@ -855,3 +855,102 @@ async def get_subreddit_summary(name: str):
         "subreddit": key,
         "overview": overview_text
     }
+
+@app.get("/api/subreddit/{name}/posts")
+async def get_subreddit_posts(name: str):
+    """Return posts for a subreddit from the scraped data."""
+    allowed = set(subreddit_summaries.keys())
+    key = name.lower()
+    if key not in allowed:
+        raise HTTPException(status_code=404, detail="Subreddit not supported in this MVP")
+    
+    # Load the scraped Reddit comments JSON
+    try:
+        json_path = os.path.join(os.path.dirname(__file__), 'reddit_comments.json')
+        with open(json_path, 'r', encoding='utf-8') as f:
+            all_posts = json.load(f)
+        
+        # Filter posts by subreddit
+        subreddit_posts = [
+            post for post in all_posts 
+            if post.get('post', {}).get('subreddit', '').lower() == key
+        ]
+        
+        # Transform to frontend format
+        transformed_posts = []
+        for item in subreddit_posts:
+            post = item.get('post', {})
+            comments = item.get('comments', [])
+            
+            # Count total comments including replies
+            def count_comments(comment_list):
+                total = len(comment_list)
+                for comment in comment_list:
+                    total += count_comments(comment.get('replies', []))
+                return total
+            
+            total_comments = count_comments(comments)
+            
+            transformed_posts.append({
+                'id': post.get('id'),
+                'title': post.get('title'),
+                'author': post.get('author'),
+                'score': post.get('score'),
+                'created_utc': post.get('created_utc'),
+                'num_comments': total_comments,
+                'url': item.get('url'),
+                'selftext': post.get('selftext', ''),
+                'subreddit': post.get('subreddit')
+            })
+        
+        return {
+            'subreddit': key,
+            'posts': transformed_posts,
+            'count': len(transformed_posts)
+        }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Reddit data not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading posts: {str(e)}")
+
+@app.get("/api/post/{post_id}")
+async def get_post_with_comments(post_id: str):
+    """Return a single post with all its comments (with hierarchical structure)."""
+    try:
+        json_path = os.path.join(os.path.dirname(__file__), 'reddit_comments.json')
+        with open(json_path, 'r', encoding='utf-8') as f:
+            all_posts = json.load(f)
+        
+        # Find the post by ID
+        post_data = None
+        for item in all_posts:
+            if item.get('post', {}).get('id') == post_id:
+                post_data = item
+                break
+        
+        if not post_data:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        post = post_data.get('post', {})
+        comments = post_data.get('comments', [])
+        
+        return {
+            'post': {
+                'id': post.get('id'),
+                'title': post.get('title'),
+                'author': post.get('author'),
+                'score': post.get('score'),
+                'created_utc': post.get('created_utc'),
+                'num_comments': post.get('num_comments'),
+                'selftext': post.get('selftext', ''),
+                'subreddit': post.get('subreddit'),
+                'url': post_data.get('url')
+            },
+            'comments': comments
+        }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Reddit data not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading post: {str(e)}")

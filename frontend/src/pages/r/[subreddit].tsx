@@ -16,6 +16,7 @@ export default function SubredditPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [overview, setOverview] = useState('')
+  const [posts, setPosts] = useState<any[]>([])
 
   useEffect(() => {
     if (!key || !allowed) return
@@ -24,12 +25,19 @@ export default function SubredditPage() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(`${BACKEND}/api/subreddit/${key}/summary`)
-        if (!res.ok) throw new Error(await res.text())
-        const data = await res.json()
-        if (!cancelled) setOverview(data?.overview ?? '')
+        // Fetch summary
+        const summaryRes = await fetch(`${BACKEND}/api/subreddit/${key}/summary`)
+        if (!summaryRes.ok) throw new Error(await summaryRes.text())
+        const summaryData = await summaryRes.json()
+        if (!cancelled) setOverview(summaryData?.overview ?? '')
+
+        // Fetch posts
+        const postsRes = await fetch(`${BACKEND}/api/subreddit/${key}/posts`)
+        if (!postsRes.ok) throw new Error(await postsRes.text())
+        const postsData = await postsRes.json()
+        if (!cancelled) setPosts(postsData?.posts ?? [])
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load summary')
+        if (!cancelled) setError(e?.message || 'Failed to load data')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -148,37 +156,100 @@ export default function SubredditPage() {
             )}
           </section>
 
-          {/* Placeholder posts list to suggest layout */}
+          {/* Posts list */}
           <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <article key={i} className="rounded-lg border border-gray-200 bg-white">
-                <div className="flex">
-                  {/* Vote bar */}
-                  <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-1 border-r border-gray-100">
-                    <button aria-label="upvote" className="p-1 rounded hover:bg-gray-100"><ArrowBigUp className="w-5 h-5" /></button>
-                    <div className="text-xs font-semibold">4.6k</div>
-                    <button aria-label="downvote" className="p-1 rounded hover:bg-gray-100"><ArrowBigDown className="w-5 h-5" /></button>
-                  </div>
-                  {/* Content */}
-                  <div className="flex-1 p-4">
-                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                      <div className="w-6 h-6 rounded-full bg-gray-200" />
-                      <span className="font-medium">u/exampleuser</span>
-                      <span>•</span>
-                      <span>18 days ago</span>
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Discussion</span>
-                    </div>
-                    <h3 className="text-base md:text-lg font-semibold mb-2">Sample post title — looks like Reddit post layout</h3>
-                    <div className="h-40 bg-gray-100 rounded mb-3" />
-                    <div className="flex items-center gap-2 text-xs">
-                      <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><MessageSquare className="w-4 h-4" /> 2.4k</button>
-                      <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><Share2 className="w-4 h-4" /> Share</button>
-                      <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"><Bookmark className="w-4 h-4" /> Save</button>
+            {loading ? (
+              // Loading skeleton
+              [...Array(3)].map((_, i) => (
+                <article key={i} className="rounded-lg border border-gray-200 bg-white animate-pulse">
+                  <div className="flex">
+                    <div className="w-12 shrink-0 border-r border-gray-100 py-3" />
+                    <div className="flex-1 p-4 space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-20 bg-gray-100 rounded" />
                     </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              ))
+            ) : posts.length > 0 ? (
+              posts.map((post) => {
+                const timeAgo = post.created_utc 
+                  ? (() => {
+                      const seconds = Math.floor(Date.now() / 1000 - post.created_utc)
+                      const days = Math.floor(seconds / 86400)
+                      const hours = Math.floor(seconds / 3600)
+                      if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
+                      if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+                      return 'just now'
+                    })()
+                  : 'recently'
+                
+                const formattedScore = post.score >= 1000 
+                  ? `${(post.score / 1000).toFixed(1)}k` 
+                  : post.score
+
+                // Create URL-friendly title slug
+                const titleSlug = post.title
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '_')
+                  .replace(/^_+|_+$/g, '')
+                  .substring(0, 100)
+                
+                const threadUrl = `/r/${post.subreddit}/comments/${post.id}/${titleSlug}`
+
+                return (
+                  <article key={post.id} className="rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition">
+                    <div className="flex">
+                      {/* Vote bar */}
+                      <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-1 border-r border-gray-100">
+                        <button aria-label="upvote" className="p-1 rounded hover:bg-gray-100">
+                          <ArrowBigUp className="w-5 h-5" />
+                        </button>
+                        <div className="text-xs font-semibold">{formattedScore}</div>
+                        <button aria-label="downvote" className="p-1 rounded hover:bg-gray-100">
+                          <ArrowBigDown className="w-5 h-5" />
+                        </button>
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 p-4">
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                          <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-semibold text-orange-600">
+                            {post.author?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                          <span className="font-medium">u/{post.author}</span>
+                          <span>•</span>
+                          <span>{timeAgo}</span>
+                        </div>
+                        <Link href={threadUrl}>
+                          <h3 className="text-base md:text-lg font-semibold mb-2 hover:text-[#FF4500] cursor-pointer">
+                            {post.title}
+                          </h3>
+                        </Link>
+                        {post.selftext && (
+                          <p className="text-sm text-gray-700 mb-3 line-clamp-3">{post.selftext}</p>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+                            <MessageSquare className="w-4 h-4" /> {post.num_comments}
+                          </button>
+                          <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+                            <Share2 className="w-4 h-4" /> Share
+                          </button>
+                          <button className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+                            <Bookmark className="w-4 h-4" /> Save
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+                <p className="text-gray-500">No posts available for this subreddit yet.</p>
+              </div>
+            )}
           </div>
         </div>
 
