@@ -18,7 +18,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Letta AI Configuration
 LETTA_API_KEY = os.getenv("LETTA_API_KEY")
-LETTA_PROJ_ID = os.getenv("LETTA_PROJ_ID")
 
 # Letta Agent IDs for multi-agent moderation
 LETTA_AGENTS = {
