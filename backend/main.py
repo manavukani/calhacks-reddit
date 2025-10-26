@@ -29,6 +29,13 @@ LETTA_AGENTS = {
     "general": "agent-c87c61a9-16a1-4a3b-9fdb-90bc015da842"
 }
 
+subreddit_summaries = {
+    "worldnews": "block-ac88325a-a2d5-47cd-9c2a-5256d1d466d4",
+    "askreddit": "block-ecb9b2d2-b5ad-437b-8eff-be732f12f8b8",
+    "science": "block-f3b35d48-a49e-4a25-ad58-34b9496246fc",
+    "askhistorians": "block-ff5d12cb-ba14-4240-8193-7fa9d38ba651"
+}
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -298,21 +305,58 @@ async def create_or_get_shared_memory(client):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to create shared memory: {str(e)}")
 
+def extract_topic_from_url(thread_url: str) -> str:
+    path = urlparse(thread_url).path.strip('/')
+    parts = [p for p in path.split('/') if p]
+    if len(parts) >= 5 and parts[2] == 'comments':
+        return parts[4]
+    return parts[-1] if parts else "unknown"
+
+def summarize_recent_activity(prev: Dict[str, Any]) -> str:
+    topics = prev.get("recent_topics", [])[-5:]
+    total_rules = prev.get("rules_triggered", 0)
+    if topics:
+        return f"Recent topics: {', '.join(topics)}. Total rules triggered: {total_rules}."
+    return f"Total rules triggered: {total_rules}."
+
+def update_subreddit_summary(client, agent_name: str, new_thread_summary: Dict[str, Any]):
+    try:
+        block_id = subreddit_summaries.get(agent_name)
+        if not block_id:
+            return
+        try:
+            current = client.blocks.get(block_id)
+            raw = getattr(current, 'value', None)
+            prev = json.loads(raw) if raw else {}
+        except Exception:
+            prev = {}
+        if not isinstance(prev, dict):
+            prev = {}
+        prev.setdefault("recent_topics", [])
+        prev.setdefault("rules_triggered", 0)
+        prev.setdefault("overview", "")
+        topic = new_thread_summary.get("topic")
+        if topic:
+            prev["recent_topics"].append(topic)
+            if len(prev["recent_topics"]) > 100:
+                prev["recent_topics"] = prev["recent_topics"][-100:]
+        prev["rules_triggered"] = int(prev.get("rules_triggered", 0)) + int(new_thread_summary.get("rule_hits", 0))
+        prev["overview"] = summarize_recent_activity(prev)
+        client.blocks.modify(block_id, value=json.dumps(prev))
+
+    except Exception:
+        pass
+
 def extract_subreddit_from_url(thread_url: str) -> str:
-    """Extract subreddit name from Reddit URL"""
     import re
-    # Pattern to match /r/subreddit/ in the URL
     match = re.search(r'/r/([^/]+)/', thread_url)
     if match:
         return match.group(1).lower()
     return "unknown"
 
 def get_agent_for_subreddit(subreddit: str) -> tuple:
-    """Get the appropriate agent for a subreddit using explicit regex matching"""
     import re
     subreddit = subreddit.lower()
-    
-    # Explicit regex patterns for each agent
     patterns = {
         "worldnews": [
             r"^worldnews$",
@@ -366,18 +410,13 @@ def get_agent_for_subreddit(subreddit: str) -> tuple:
             r"^renaissance$"
         ]
     }
-    
-    # Check each agent's patterns
     for agent_name, pattern_list in patterns.items():
         for pattern in pattern_list:
             if re.match(pattern, subreddit):
                 return agent_name, LETTA_AGENTS[agent_name]
-    
-    # Default fallback to general_agent for unmatched subreddits
     return "general", LETTA_AGENTS["general"]
 
 async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit_name: str):
-    """Moderate content using a specific Letta agent"""
     try:
         response = client.agents.messages.create(
             agent_id=agent_id,
@@ -387,21 +426,15 @@ async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit
             }]
         )
         agent_reply = response.messages[-1].content
-        
-        # Parse the response to extract structured data
         decision = "UNKNOWN"
         confidence = 0.5
         reason = agent_reply
-        
-        # Try to parse structured response
         if "VIOLATION" in agent_reply.upper():
             decision = "VIOLATION"
         elif "NEEDS_WARNING" in agent_reply.upper() or "WARNING" in agent_reply.upper():
             decision = "NEEDS_WARNING"
         elif "FINE" in agent_reply.upper() or "CLEAN" in agent_reply.upper():
             decision = "FINE"
-        
-        # Extract confidence if mentioned
         import re
         confidence_match = re.search(r'confidence[:\s]*([0-9.]+)', agent_reply.lower())
         if confidence_match:
@@ -409,7 +442,6 @@ async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit
                 confidence = float(confidence_match.group(1))
             except:
                 pass
-        
         return {
             "subreddit": subreddit_name,
             "agent_id": agent_id,
@@ -429,17 +461,12 @@ async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit
         }
 
 async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment_count: int = 0):
-    """Aggregate moderation decisions and simulate comment-level flagging statistics"""
     if not decisions:
         return {"final_decision": "NO_DATA", "confidence": 0.0, "reason": "No agent responses"}
-    
-    # For single agent, simulate comment-level analysis based on the agent's decision
     if len(decisions) == 1:
         decision = decisions[0]
         verdict = decision.get("decision", "ERROR")
         confidence = decision.get("confidence", 0.0)
-        
-        # Map single agent decision to final decision
         if verdict == "VIOLATION":
             final_decision = "VIOLATION"
         elif verdict == "NEEDS_WARNING":
@@ -448,32 +475,24 @@ async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment
             final_decision = "CLEAN"
         else:
             final_decision = "INCONCLUSIVE"
-        
-        # Simulate comment-level flagging based on agent decision and confidence
         import random
-        random.seed(hash(str(decision.get("reason", "")) + str(comment_count)))  # Deterministic randomness
-        
+        random.seed(hash(str(decision.get("reason", "")) + str(comment_count)))
         if verdict == "VIOLATION":
-            # High violation content - most comments flagged
             violation_count = max(1, int(comment_count * (0.6 + confidence * 0.3)))
             warning_count = max(0, int(comment_count * (0.1 + (1-confidence) * 0.2)))
             clean_count = max(0, comment_count - violation_count - warning_count)
         elif verdict == "NEEDS_WARNING":
-            # Warning content - some comments flagged
             violation_count = max(0, int(comment_count * (0.1 + (1-confidence) * 0.2)))
             warning_count = max(1, int(comment_count * (0.3 + confidence * 0.4)))
             clean_count = max(0, comment_count - violation_count - warning_count)
         elif verdict == "FINE":
-            # Clean content - most comments clean
             violation_count = max(0, int(comment_count * (0.05 + (1-confidence) * 0.1)))
             warning_count = max(0, int(comment_count * (0.1 + (1-confidence) * 0.15)))
             clean_count = max(0, comment_count - violation_count - warning_count)
         else:
-            # Error or unknown - default distribution
             violation_count = max(0, int(comment_count * 0.1))
             warning_count = max(0, int(comment_count * 0.2))
             clean_count = max(0, comment_count - violation_count - warning_count)
-        
         return {
             "final_decision": final_decision,
             "confidence": confidence,
@@ -486,22 +505,16 @@ async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment
             "total_agents": 1,
             "valid_responses": 1
         }
-    
-    # Multi-agent logic (kept for backward compatibility)
     verdict_counts = {"VIOLATION": 0, "NEEDS_WARNING": 0, "FINE": 0, "ERROR": 0}
     total_confidence = 0.0
     valid_responses = 0
-    
     for decision in decisions:
         verdict = decision.get("decision", "ERROR")
         confidence = decision.get("confidence", 0.0)
-        
         if verdict in verdict_counts:
             verdict_counts[verdict] += 1
             total_confidence += confidence
             valid_responses += 1
-    
-    # Determine final decision based on majority
     if verdict_counts["VIOLATION"] > len(decisions) / 2:
         final_decision = "PLATFORM_VIOLATION"
     elif verdict_counts["NEEDS_WARNING"] > 0:
@@ -510,9 +523,7 @@ async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment
         final_decision = "CLEAN"
     else:
         final_decision = "INCONCLUSIVE"
-    
     avg_confidence = total_confidence / valid_responses if valid_responses > 0 else 0.0
-    
     return {
         "final_decision": final_decision,
         "confidence": avg_confidence,
@@ -521,35 +532,24 @@ async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment
         "valid_responses": valid_responses
     }
 
-# ---------- comment classification helpers ----------
-
 def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_basis: str = "", base_reason: str = "") -> List[Dict[str, Any]]:
-    """Deterministically assign labels to individual comments to match aggregate counts.
-    Labels: VIOLATION, NEEDS_WARNING, FINE, ERROR
-    """
     import random
     n = len(comments)
     v = max(0, min(counts.get("VIOLATION", 0), n))
     w = max(0, min(counts.get("NEEDS_WARNING", 0), n))
     c = max(0, min(counts.get("FINE", 0), n))
     e = max(0, min(counts.get("ERROR", 0), n))
-
     total = v + w + c + e
-    # If totals don't cover all comments, fill remaining with clean
     if total < n:
         c += (n - total)
-
     labels = (["VIOLATION"] * v) + (["NEEDS_WARNING"] * w) + (["FINE"] * c) + (["ERROR"] * e)
-    # Trim or pad just in case
     labels = (labels + ["FINE"] * n)[:n]
-
     idxs = list(range(n))
     random.seed(hash(seed_basis) + n)
     random.shuffle(idxs)
     assigned = [None] * n
     for i, idx in enumerate(idxs):
         assigned[idx] = labels[i]
-
     def label_reason(label: str) -> str:
         if label == "VIOLATION":
             return f"Flagged as violation. Agent rationale: {base_reason}" if base_reason else "Flagged as violation by agent."
@@ -558,7 +558,6 @@ def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_ba
         if label == "FINE":
             return f"No policy issues detected. Agent rationale: {base_reason}" if base_reason else "No policy issues detected."
         return "Classification error or unavailable."
-
     return [{"text": comments[i], "label": assigned[i], "reason": label_reason(assigned[i])} for i in range(n)]
 
 def compute_counts_from_classifications(classifications: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -570,9 +569,6 @@ def compute_counts_from_classifications(classifications: List[Dict[str, Any]]) -
     return counts
 
 def classify_comments_with_letta(client, agent_id: str, comments: List[str], max_items: int = 50) -> List[Dict[str, Any]]:
-    """Call Letta per comment to obtain a label and short reason. Falls back to heuristic parsing.
-    Returns list of {text, label, reason}.
-    """
     results = []
     selected = comments[:max_items]
     for text in selected:
@@ -608,16 +604,13 @@ def classify_comments_with_letta(client, agent_id: str, comments: List[str], max
             results.append({"text": text, "label": "ERROR", "reason": f"Agent error: {str(e)}"})
     return results
 
-# ---------- routes ----------
-
 @app.get("/health")
 async def health():
     active_key = None
     if API_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
         active_key = ANTHROPIC_API_KEY[:10]
-    
     return {
-        "ok": True, 
+        "ok": True,
         "time": time.time(),
         "api_provider": API_PROVIDER,
         "has_anthropic_key": bool(ANTHROPIC_API_KEY),
@@ -644,7 +637,6 @@ async def analyze(body: Dict[str, Any] = Body(...)):
     if not comments:
         return {"analysis": {"sentiment_overall":"neutral","top_keywords":[],"toxicity_ratio":0,"themes":[]}, "count": 0}
     content = await claude_chat(build_analysis_prompt(comments), max_tokens=400)
-    # attempt JSON parse; if model returns text, wrap safely
     try:
         analysis = json.loads(content)
     except Exception:
@@ -653,13 +645,11 @@ async def analyze(body: Dict[str, Any] = Body(...)):
 
 @app.post("/api/compare")
 async def compare_threads(body: Dict[str, Any] = Body(...)):
-    """Compare multiple Reddit threads side-by-side"""
     urls = body.get("thread_urls", [])
     if not urls or len(urls) < 2:
         raise HTTPException(status_code=400, detail="At least 2 thread URLs required")
     if len(urls) > 5:
         raise HTTPException(status_code=400, detail="Maximum 5 threads allowed")
-    
     results = []
     for url in urls:
         comments = await fetch_reddit_comments(url)
@@ -671,33 +661,27 @@ async def compare_threads(body: Dict[str, Any] = Body(...)):
                 "count": 0
             })
             continue
-        
         summary_content = await claude_chat(build_summary_prompt(comments))
         analysis_content = await claude_chat(build_analysis_prompt(comments), max_tokens=400)
-        
         try:
             analysis = json.loads(analysis_content)
         except Exception:
             analysis = {"raw": analysis_content}
-        
         results.append({
             "url": url,
             "summary": summary_content.strip(),
             "analysis": analysis,
             "count": len(comments)
         })
-    
     return {"threads": results}
 
 @app.post("/api/batch")
 async def batch_analyze(body: Dict[str, Any] = Body(...)):
-    """Batch analyze multiple threads (Enterprise feature)"""
     urls = body.get("thread_urls", [])
     if not urls:
         raise HTTPException(status_code=400, detail="thread_urls array is required")
     if len(urls) > 20:
         raise HTTPException(status_code=400, detail="Maximum 20 threads allowed in batch")
-    
     results = []
     for url in urls:
         try:
@@ -709,15 +693,12 @@ async def batch_analyze(body: Dict[str, Any] = Body(...)):
                     "error": "No comments found"
                 })
                 continue
-            
             summary_content = await claude_chat(build_summary_prompt(comments))
             analysis_content = await claude_chat(build_analysis_prompt(comments), max_tokens=400)
-            
             try:
                 analysis = json.loads(analysis_content)
             except Exception:
                 analysis = {"raw": analysis_content}
-            
             results.append({
                 "url": url,
                 "status": "success",
@@ -731,7 +712,6 @@ async def batch_analyze(body: Dict[str, Any] = Body(...)):
                 "status": "error",
                 "error": str(e)
             })
-    
     return {
         "total": len(urls),
         "successful": len([r for r in results if r.get("status") == "success"]),
@@ -741,7 +721,6 @@ async def batch_analyze(body: Dict[str, Any] = Body(...)):
 
 @app.get("/api/stats")
 async def get_stats():
-    """Get API usage statistics (demo endpoint)"""
     return {
         "total_analyses": 1247,
         "active_users": 89,
@@ -752,35 +731,20 @@ async def get_stats():
 
 @app.post("/api/moderate")
 async def moderate_content(body: Dict[str, Any] = Body(...)):
-    """Single-agent moderation using relevant Letta AI agent based on subreddit"""
     thread_url = body.get("thread_url")
     if not thread_url:
         raise HTTPException(status_code=400, detail="thread_url is required")
-    
     try:
-        # Get Letta client
         client = get_letta_client()
-        
-        # Extract subreddit from URL
         detected_subreddit = extract_subreddit_from_url(thread_url)
         agent_subreddit, agent_id = get_agent_for_subreddit(detected_subreddit)
-        
-        # Fetch Reddit comments
         comments = await fetch_reddit_comments(thread_url)
         if not comments:
             raise HTTPException(status_code=400, detail="No comments found or thread unavailable")
-        
-        # Create thread text for moderation
-        thread_text = f"Reddit Thread: {thread_url}\n\nComments:\n" + "\n\n".join(comments[:50])  # Limit to first 50 comments
-        
-        # Create or get shared memory
+        thread_text = f"Reddit Thread: {thread_url}\n\nComments:\n" + "\n\n".join(comments[:50])
         shared_memory = await create_or_get_shared_memory(client)
-        
-        # Moderate with the relevant agent only
         result = await moderate_with_agent(client, agent_id, thread_text, agent_subreddit)
         moderation_results = [result]
-        
-        # Save results to shared memory
         try:
             client.blocks.update(
                 block_id=shared_memory.id,
@@ -788,11 +752,7 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
             )
         except Exception as e:
             print(f"Warning: Could not update shared memory: {e}")
-        
-        # Get final decision with comment-level statistics
         final_decision = await aggregate_moderation_verdicts(moderation_results, len(comments))
-
-        # Build per-comment classifications. Prefer Letta per-comment reasons when available.
         try:
             if LETTA_API_KEY:
                 comment_classifications = classify_comments_with_letta(client, agent_id, comments, max_items=50)
@@ -805,11 +765,16 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
                 seed_basis=str(result.get("reason", "")) + str(len(comments)),
                 base_reason=str(result.get("reason", ""))
             )
-
-        # Recompute breakdown from actual per-comment labels for consistency
         recomputed_counts = compute_counts_from_classifications(comment_classifications)
         final_decision["verdict_breakdown"] = recomputed_counts
-
+        try:
+            new_thread_summary = {
+                "topic": extract_topic_from_url(thread_url),
+                "rule_hits": int(recomputed_counts.get("VIOLATION", 0)) + int(recomputed_counts.get("NEEDS_WARNING", 0))
+            }
+            update_subreddit_summary(client, agent_subreddit, new_thread_summary)
+        except Exception:
+            pass
         return {
             "thread_url": thread_url,
             "detected_subreddit": detected_subreddit,
@@ -820,7 +785,6 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
             "shared_memory_id": shared_memory.id,
             "comment_classifications": comment_classifications
         }
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -828,7 +792,6 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
 
 @app.get("/api/moderate/health")
 async def moderation_health():
-    """Check Letta moderation system health"""
     try:
         if not LETTA_API_KEY:
             return {
@@ -836,10 +799,8 @@ async def moderation_health():
                 "message": "Letta API key not configured",
                 "agents_available": False
             }
-        
         client = get_letta_client()
         shared_memory = await create_or_get_shared_memory(client)
-        
         return {
             "status": "healthy",
             "message": "Letta moderation system ready",
@@ -850,7 +811,7 @@ async def moderation_health():
         }
     except Exception as e:
         return {
-            "status": "error", 
+            "status": "error",
             "message": f"Letta system error: {str(e)}",
             "agents_available": False
         }
