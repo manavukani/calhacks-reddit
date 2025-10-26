@@ -313,11 +313,27 @@ def extract_topic_from_url(thread_url: str) -> str:
     return parts[-1] if parts else "unknown"
 
 def summarize_recent_activity(prev: Dict[str, Any]) -> str:
-    topics = prev.get("recent_topics", [])[-5:]
-    total_rules = prev.get("rules_triggered", 0)
+    topics = prev.get("recent_topics", [])
+    total_rules = prev.get("rules_triggered", 0) 
+    avg_rules = prev.get("avg_rules_per_thread", 0)
+    active_hours = prev.get("active_hours", [])
+    
+    summary_parts = []
     if topics:
-        return f"Recent topics: {', '.join(topics)}. Total rules triggered: {total_rules}."
-    return f"Total rules triggered: {total_rules}."
+        topic_summary = f"Recent discussion topics: {', '.join(topics[-10:])}"
+        summary_parts.append(topic_summary)
+    
+    rule_summary = f"Total policy flags: {total_rules}"
+    if avg_rules:
+        rule_summary += f" (avg {avg_rules:.1f} per thread)"
+    summary_parts.append(rule_summary)
+    
+    if active_hours:
+        peak_hours = sorted(active_hours, key=lambda x: x[1], reverse=True)[:3]
+        hours_fmt = [f"{h}:00" for h,_ in peak_hours]
+        summary_parts.append(f"Peak activity at: {', '.join(hours_fmt)}")
+        
+    return " ".join(summary_parts)
 
 def update_subreddit_summary(client, agent_name: str, new_thread_summary: Dict[str, Any]):
     try:
@@ -338,8 +354,6 @@ def update_subreddit_summary(client, agent_name: str, new_thread_summary: Dict[s
         topic = new_thread_summary.get("topic")
         if topic:
             prev["recent_topics"].append(topic)
-            if len(prev["recent_topics"]) > 100:
-                prev["recent_topics"] = prev["recent_topics"][-100:]
         prev["rules_triggered"] = int(prev.get("rules_triggered", 0)) + int(new_thread_summary.get("rule_hits", 0))
         prev["overview"] = summarize_recent_activity(prev)
         client.blocks.modify(block_id, value=json.dumps(prev))
@@ -843,10 +857,10 @@ async def get_subreddit_summary(name: str):
     # Mock fallback if empty
     if not overview_text:
         examples = {
-            "worldnews": "Global headlines are shifting fast today. Major geopolitical moves, markets reacting, and developing stories across regions.",
-            "askreddit": "Community questions are lively. Thought-provoking prompts, hot takes, and plenty of personal stories in the mix.",
-            "science": "New papers and preprints are trending. Discussion around methodology, reproducibility, and implications across fields.",
-            "askhistorians": "Deep dives into primary sources and context. Experts clarifying common myths and unpacking nuanced timelines."
+            "worldnews": "Canadian politics heating up as Poilievre's approval hits record lows. Hurricane Melissa rapidly intensifying toward Category 5 status. Ukraine celebrates historic Gripen fighter jet deal with 150 aircraft arriving in 2026. Geopolitical tensions and climate events dominating discussions.",
+            "askreddit": "Users sharing deeply personal stories and life reflections. Top discussions: biggest regrets, recognizing true love, and life before vs. after the pandemic. Mix of heartfelt confessions, relationship advice, and nostalgic reminiscing creating thoughtful community dialogue.",
+            "science": "Groundbreaking research making waves: gut microbes affecting calorie absorption, scientists building the smallest engine ever (hotter than the sun!), and new study linking gender equality to women's fitness levels. Community debating methodology, implications, and reproducibility of findings.",
+            "askhistorians": "Fascinating historical deep-dives trending: experts unpacking the unexpected Wright Brothers' flight just days after NYT declared it impossible. James Bond's iconic drink order analyzed through cultural lens. Robber Barons' philanthropy vs. modern billionaires sparking nuanced debate about generosity and legacy."
         }
         overview_text = examples.get(key, "No summary available yet. Run moderation/analysis to populate activity.")
 
