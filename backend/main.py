@@ -815,3 +815,43 @@ async def moderation_health():
             "message": f"Letta system error: {str(e)}",
             "agents_available": False
         }
+
+@app.get("/api/subreddit/{name}/summary")
+async def get_subreddit_summary(name: str):
+    """Return a short overview for a supported subreddit from Letta memory.
+    Falls back to a mock message if Letta is not configured or unavailable.
+    """
+    allowed = set(subreddit_summaries.keys())
+    key = name.lower()
+    if key not in allowed:
+        raise HTTPException(status_code=404, detail="Subreddit not supported in this MVP")
+
+    overview_text = ""
+    # Try Letta block if configured
+    try:
+        if LETTA_API_KEY:
+            client = get_letta_client()
+            block_id = subreddit_summaries[key]
+            block = client.blocks.get(block_id)
+            raw = getattr(block, 'value', None)
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict):
+                overview_text = str(data.get("overview", "")).strip()
+    except Exception:
+        pass
+
+    # Mock fallback if empty
+    if not overview_text:
+        examples = {
+            "worldnews": "Global headlines are shifting fast today. Major geopolitical moves, markets reacting, and developing stories across regions.",
+            "askreddit": "Community questions are lively. Thought-provoking prompts, hot takes, and plenty of personal stories in the mix.",
+            "science": "New papers and preprints are trending. Discussion around methodology, reproducibility, and implications across fields.",
+            "askhistorians": "Deep dives into primary sources and context. Experts clarifying common myths and unpacking nuanced timelines."
+        }
+        overview_text = examples.get(key, "No summary available yet. Run moderation/analysis to populate activity.")
+
+    # Keep it concise to a few sentences
+    return {
+        "subreddit": key,
+        "overview": overview_text
+    }
