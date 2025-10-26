@@ -21,7 +21,7 @@ export default function ExportButton({ data, threadUrl }: ExportButtonProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `threadsense-analysis-${Date.now()}.json`;
+    a.download = `reddit-thread-analysis-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     setIsOpen(false);
@@ -74,7 +74,7 @@ export default function ExportButton({ data, threadUrl }: ExportButtonProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `threadsense-report-${Date.now()}.txt`;
+    a.download = `reddit-thread-report-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     setIsOpen(false);

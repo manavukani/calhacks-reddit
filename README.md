@@ -38,7 +38,7 @@ Reddit:AI transforms chaotic Reddit discussions into actionable insights with ad
 
 1. **Clone and setup backend:**
 ```bash
-cd threadsense
+cd calhacks-reddit
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install fastapi uvicorn httpx python-dotenv
@@ -145,7 +145,7 @@ npm run dev
 ## 📁 Project Structure
 
 ```
-threadsense/
+root/
 ├── backend/
 │   └── main.py              # FastAPI server with AI integration
 ├── frontend/
