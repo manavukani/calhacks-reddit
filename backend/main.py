@@ -374,7 +374,7 @@ def get_agent_for_subreddit(subreddit: str) -> tuple:
                 return agent_name, LETTA_AGENTS[agent_name]
     
     # Default fallback to general_agent for unmatched subreddits
-    return "general_agent", LETTA_AGENTS["general_agent"]
+    return "general", LETTA_AGENTS["general"]
 
 async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit_name: str):
     """Moderate content using a specific Letta agent"""
