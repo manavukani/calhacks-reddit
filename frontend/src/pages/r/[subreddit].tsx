@@ -132,7 +132,7 @@ export default function SubredditPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* What’s going on card */}
           <section
-            className="relative rounded-xl bg-white p-5 drop-shadow-xl shadow-2xl border border-gray-200"
+            className="relative rounded-xl bg-white p-5 drop-shadow-[0_10px_13px_rgba(255,69,0,0.06)] shadow-[0_20px_25px_-5px_rgba(255,69,0,0.1)] border border-gray-200"
           >
             <div className="text-lg font-semibold mb-2">What’s going on?</div>
             {loading ? (
@@ -186,7 +186,7 @@ export default function SubredditPage() {
         <aside className="space-y-4 lg:sticky lg:top-4 self-start">
           <div className="rounded-xl border border-gray-200 bg-white p-4 drop-shadow-md">
             <div className="text-sm font-semibold mb-2">About community</div>
-            <div className="text-xs text-gray-600">MVP clone feel. Styling follows your theme.</div>
+            <div className="text-xs text-gray-600">MVP for CalHacks. Reddit in 2025.</div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div>
                 <div className="text-gray-500">Created</div>
