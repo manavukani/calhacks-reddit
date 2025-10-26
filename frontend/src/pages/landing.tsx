@@ -23,7 +23,6 @@ export default function Landing() {
                 <Target className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900">Reddit:AI</span>
-              <span className="text-xl font-bold text-gray-900">Reddit:AI</span>
             </div>
             <div className="flex items-center gap-6">
               <a href="/dashboard" className="px-6 py-2 bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">

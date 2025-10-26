@@ -121,7 +121,7 @@ export default function APIPage() {
               <span className="text-xl font-bold text-gray-900">Reddit:AI API</span>
             </div>
             <div className="flex items-center gap-4">
-              <a href="/" className="text-gray-700 hover:text-[#FF4500] transition">Home</a>
+              <a href="/landing" className="text-gray-700 hover:text-[#FF4500] transition">Home</a>
               <a href="/dashboard" className="px-4 py-2 bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">
                 Launch App
               </a>

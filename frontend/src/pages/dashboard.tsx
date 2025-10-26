@@ -175,7 +175,7 @@ export default function Dashboard() {
       <div className="bg-white border-b border-gray-300 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <a href="/landing" className="flex items-center gap-3">
               <div className="w-12 h-12 bg-[#FF4500] rounded-full flex items-center justify-center">
                 <Target className="w-7 h-7 text-white" />
               </div>
@@ -183,7 +183,7 @@ export default function Dashboard() {
                 <h1 className="text-2xl font-bold text-gray-900">Reddit:AI</h1>
                 <p className="text-sm text-gray-600">AI-Powered Reddit Analysis</p>
               </div>
-            </div>
+            </a>
             <div className="flex gap-2">
               {backUrl && (
                 <a href={backUrl} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-full transition font-semibold flex items-center gap-1">

@@ -77,7 +77,7 @@ export default function SubredditPage() {
       {/* Top navbar */}
       <div className="fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/landing" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#FF4500] rounded-full flex items-center justify-center">
               <Target className="w-5 h-5 text-white" />
             </div>
