@@ -341,7 +341,7 @@ def update_subreddit_summary(client, agent_name: str, new_thread_summary: Dict[s
         if not block_id:
             return
         try:
-            current = client.blocks.get(block_id)
+            current = client.blocks.retrieve(block_id)
             raw = getattr(current, 'value', None)
             prev = json.loads(raw) if raw else {}
         except Exception:
@@ -367,6 +367,32 @@ def extract_subreddit_from_url(thread_url: str) -> str:
     if match:
         return match.group(1).lower()
     return "unknown"
+
+async def describe_subreddit_from_memory(client, subreddit_key: str, memory_data: Dict[str, Any]) -> str:
+    """Ask the subreddit-specific Letta agent to narrate a brief description from memory data.
+    Returns a 1-2 sentence third-person summary or empty string on error.
+    """
+    try:
+        agent_id = LETTA_AGENTS.get(subreddit_key, LETTA_AGENTS.get("general"))
+        payload_json = json.dumps({
+            "overview": memory_data.get("overview", ""),
+            "recent_topics": memory_data.get("recent_topics", [])[:10],
+            "rules_triggered": memory_data.get("rules_triggered", 0),
+        }, ensure_ascii=False)
+        prompt = (
+            "From the following memory snapshot about a subreddit, write 1-2 concise sentences in third person "
+            "describing current community activity, trends, or mood. Avoid bullet lists, avoid quoting fields verbatim, "
+            "and do not include metrics unless needed. Keep it neutral, readable, and suitable for a sidebar overview.\n\n"
+            f"Memory JSON:\n{payload_json}"
+        )
+        resp = client.agents.messages.create(
+            agent_id=agent_id,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = str(resp.messages[-1].content).strip()
+        return text
+    except Exception:
+        return ""
 
 def get_agent_for_subreddit(subreddit: str) -> tuple:
     import re
@@ -841,16 +867,19 @@ async def get_subreddit_summary(name: str):
         raise HTTPException(status_code=404, detail="Subreddit not supported in this MVP")
 
     overview_text = ""
-    # Try Letta block if configured
+
+    # Try Letta block + have agent narrate from memory
     try:
         if LETTA_API_KEY:
             client = get_letta_client()
             block_id = subreddit_summaries[key]
-            block = client.blocks.get(block_id)
+            block = client.blocks.retrieve(block_id)
             raw = getattr(block, 'value', None)
             data = json.loads(raw) if raw else {}
             if isinstance(data, dict):
-                overview_text = str(data.get("overview", "")).strip()
+                # Prefer an agent-composed description; fallback to stored overview text
+                agent_view = await describe_subreddit_from_memory(client, key, data)
+                overview_text = agent_view.strip() or str(data.get("overview", "")).strip()
     except Exception:
         pass
 
