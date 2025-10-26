@@ -13,6 +13,7 @@ interface AgentDecision {
 interface CommentClassification {
   text: string;
   label: 'VIOLATION' | 'NEEDS_WARNING' | 'FINE' | 'ERROR';
+  reason?: string;
 }
 
 interface FinalDecision {
@@ -264,8 +265,8 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               violations.map((c, i) => (
                                 <li key={`v-${i}`} className="p-2 rounded border border-red-200 bg-red-50">
                                   <p className="text-red-900">{c.text}</p>
-                                  {('reason' in c) && (
-                                    <p className="mt-1 text-xs text-red-700">{(c as any).reason}</p>
+                                  {c.reason && (
+                                    <p className="mt-1 text-xs text-red-700">{c.reason}</p>
                                   )}
                                 </li>
                               ))
@@ -281,8 +282,8 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               warnings.map((c, i) => (
                                 <li key={`w-${i}`} className="p-2 rounded border border-yellow-200 bg-yellow-50">
                                   <p className="text-yellow-900">{c.text}</p>
-                                  {('reason' in c) && (
-                                    <p className="mt-1 text-xs text-yellow-700">{(c as any).reason}</p>
+                                  {c.reason && (
+                                    <p className="mt-1 text-xs text-yellow-700">{c.reason}</p>
                                   )}
                                 </li>
                               ))
@@ -298,8 +299,8 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               clean.map((c, i) => (
                                 <li key={`c-${i}`} className="p-2 rounded border border-green-200 bg-green-50">
                                   <p className="text-green-900">{c.text}</p>
-                                  {('reason' in c) && (
-                                    <p className="mt-1 text-xs text-green-700">{(c as any).reason}</p>
+                                  {c.reason && (
+                                    <p className="mt-1 text-xs text-green-700">{c.reason}</p>
                                   )}
                                 </li>
                               ))
@@ -315,8 +316,8 @@ export default function ModerationCard({ threadUrl, onModerate, loading, result,
                               errors.map((c, i) => (
                                 <li key={`e-${i}`} className="p-2 rounded border border-gray-200 bg-gray-50">
                                   <p className="text-gray-900">{c.text}</p>
-                                  {('reason' in c) && (
-                                    <p className="mt-1 text-xs text-gray-600">{(c as any).reason}</p>
+                                  {c.reason && (
+                                    <p className="mt-1 text-xs text-gray-600">{c.reason}</p>
                                   )}
                                 </li>
                               ))

@@ -560,6 +560,53 @@ def assign_labels_by_counts(comments: List[str], counts: Dict[str, int], seed_ba
 
     return [{"text": comments[i], "label": assigned[i], "reason": label_reason(assigned[i])} for i in range(n)]
 
+def compute_counts_from_classifications(classifications: List[Dict[str, Any]]) -> Dict[str, int]:
+    counts = {"VIOLATION": 0, "NEEDS_WARNING": 0, "FINE": 0, "ERROR": 0}
+    for c in classifications:
+        label = c.get("label")
+        if label in counts:
+            counts[label] += 1
+    return counts
+
+def classify_comments_with_letta(client, agent_id: str, comments: List[str], max_items: int = 50) -> List[Dict[str, Any]]:
+    """Call Letta per comment to obtain a label and short reason. Falls back to heuristic parsing.
+    Returns list of {text, label, reason}.
+    """
+    results = []
+    selected = comments[:max_items]
+    for text in selected:
+        try:
+            resp = client.agents.messages.create(
+                agent_id=agent_id,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        "Classify this single Reddit comment strictly into one of: VIOLATION, NEEDS_WARNING, FINE.\n"
+                        "Return ONLY compact JSON: {\"label\": <VIOLATION|NEEDS_WARNING|FINE>, \"reason\": <short rationale 8-20 words>}.\n\n"
+                        f"Comment: \n{text}"
+                    )
+                }]
+            )
+            agent_reply = resp.messages[-1].content
+            label = "FINE"
+            reason = agent_reply
+            try:
+                parsed = json.loads(agent_reply)
+                label = str(parsed.get("label", "FINE")).upper()
+                reason = str(parsed.get("reason", reason))
+            except Exception:
+                up = agent_reply.upper()
+                if "VIOLATION" in up:
+                    label = "VIOLATION"
+                elif "WARNING" in up or "NEEDS_WARNING" in up:
+                    label = "NEEDS_WARNING"
+                else:
+                    label = "FINE"
+            results.append({"text": text, "label": label, "reason": reason})
+        except Exception as e:
+            results.append({"text": text, "label": "ERROR", "reason": f"Agent error: {str(e)}"})
+    return results
+
 # ---------- routes ----------
 
 @app.get("/health")
@@ -744,13 +791,23 @@ async def moderate_content(body: Dict[str, Any] = Body(...)):
         # Get final decision with comment-level statistics
         final_decision = await aggregate_moderation_verdicts(moderation_results, len(comments))
 
-        # Build per-comment classifications matching the aggregate counts
-        comment_classifications = assign_labels_by_counts(
-            comments,
-            final_decision.get("verdict_breakdown", {}),
-            seed_basis=str(result.get("reason", "")) + str(len(comments)),
-            base_reason=str(result.get("reason", ""))
-        )
+        # Build per-comment classifications. Prefer Letta per-comment reasons when available.
+        try:
+            if LETTA_API_KEY:
+                comment_classifications = classify_comments_with_letta(client, agent_id, comments, max_items=50)
+            else:
+                raise RuntimeError("Letta unavailable")
+        except Exception:
+            comment_classifications = assign_labels_by_counts(
+                comments,
+                final_decision.get("verdict_breakdown", {}),
+                seed_basis=str(result.get("reason", "")) + str(len(comments)),
+                base_reason=str(result.get("reason", ""))
+            )
+
+        # Recompute breakdown from actual per-comment labels for consistency
+        recomputed_counts = compute_counts_from_classifications(comment_classifications)
+        final_decision["verdict_breakdown"] = recomputed_counts
 
         return {
             "thread_url": thread_url,
