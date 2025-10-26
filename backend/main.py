@@ -25,7 +25,8 @@ LETTA_AGENTS = {
     "worldnews": "agent-8fd7b94e-10a7-4413-ad0b-2f55057a7e9b",
     "askreddit": "agent-ab2acbb6-d500-4831-b0d1-4e68a3fb0bb0", 
     "science": "agent-5a976cf5-a506-4232-b6ca-eb4f7a2fa450",
-    "askhistorians": "agent-4c1e7105-9cf7-4104-92ef-cfbd5b8ff89d"
+    "askhistorians": "agent-4c1e7105-9cf7-4104-92ef-cfbd5b8ff89d",
+    "general_agent": "agent-c87c61a9-16a1-4a3b-9fdb-90bc015da842"
 }
 
 app = FastAPI()
@@ -372,8 +373,8 @@ def get_agent_for_subreddit(subreddit: str) -> tuple:
             if re.match(pattern, subreddit):
                 return agent_name, LETTA_AGENTS[agent_name]
     
-    # Default fallback to askreddit for unmatched subreddits
-    return "askreddit", LETTA_AGENTS["askreddit"]
+    # Default fallback to general_agent for unmatched subreddits
+    return "general_agent", LETTA_AGENTS["general_agent"]
 
 async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit_name: str):
     """Moderate content using a specific Letta agent"""
