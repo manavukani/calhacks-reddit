@@ -5,6 +5,7 @@ import KeywordCloud from '../components/KeywordCloud';
 import EmotionChart from '../components/EmotionChart';
 import MetricCard from '../components/MetricCard';
 import ExportButton from '../components/ExportButton';
+import ModerationCard from '../components/ModerationCard';
 
 export default function Dashboard() {
   const [url, setUrl] = useState("");
@@ -13,6 +14,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [count, setCount] = useState(0);
   const [error, setError] = useState<string>("");
+  
+  // Moderation state
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [moderationResult, setModerationResult] = useState<any>(null);
+  const [moderationError, setModerationError] = useState<string>("");
 
   const tryExample = (exampleUrl: string) => {
     setUrl(exampleUrl);
@@ -94,6 +100,45 @@ export default function Dashboard() {
     }
     
     setLoading(false);
+  }
+
+  async function moderateThread(threadUrl: string) {
+    if (!threadUrl.trim()) {
+      setModerationError("Please enter a Reddit thread URL");
+      throw new Error("Please enter a Reddit thread URL");
+    }
+    if (!threadUrl.includes('reddit.com')) {
+      setModerationError("Please enter a valid Reddit URL");
+      throw new Error("Please enter a valid Reddit URL");
+    }
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    setModerationError("");
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/moderate", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ thread_url: threadUrl })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to moderate thread');
+      }
+      
+      const result = await response.json();
+      setModerationResult(result);
+      return result;
+    } catch (err) {
+      console.error("Moderation failed:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to moderate thread. Please check the URL and try again.";
+      setModerationError(errorMessage);
+      throw err;
+    } finally {
+      setModerationLoading(false);
+    }
   }
 
   return (
@@ -231,6 +276,15 @@ export default function Dashboard() {
                 threadUrl={url}
               />
             </div>
+
+            {/* AI Moderation Card */}
+            <ModerationCard
+              threadUrl={url}
+              onModerate={moderateThread}
+              loading={moderationLoading}
+              result={moderationResult}
+              error={moderationError}
+            />
             
             {/* Summary Section */}
             <div className="bg-white rounded-lg shadow-md p-6 border border-gray-300">

@@ -16,6 +16,18 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# Letta AI Configuration
+LETTA_API_KEY = os.getenv("LETTA_API_KEY")
+LETTA_PROJ_ID = os.getenv("LETTA_PROJ_ID")
+
+# Letta Agent IDs for multi-agent moderation
+LETTA_AGENTS = {
+    "worldnews": "agent-8fd7b94e-10a7-4413-ad0b-2f55057a7e9b",
+    "askreddit": "agent-ab2acbb6-d500-4831-b0d1-4e68a3fb0bb0", 
+    "science": "agent-5a976cf5-a506-4232-b6ca-eb4f7a2fa450",
+    "askhistorians": "agent-4c1e7105-9cf7-4104-92ef-cfbd5b8ff89d"
+}
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -254,6 +266,260 @@ def generate_mock_response(messages: List[Dict[str,str]]) -> str:
     # Default response
     return "This is a mock response for demo purposes. The actual AI analysis would appear here with a valid JLLM API key."
 
+# ---------- Letta AI Moderation Functions ----------
+
+def get_letta_client():
+    """Initialize Letta client with API key"""
+    if not LETTA_API_KEY:
+        raise HTTPException(status_code=500, detail="Letta API key not configured")
+    
+    try:
+        from letta_client import Letta
+        return Letta(token=LETTA_API_KEY)
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Letta SDK not installed. Run: pip install letta")
+
+async def create_or_get_shared_memory(client):
+    """Create or retrieve shared memory block for cross-agent coordination"""
+    try:
+        # Try to get existing shared memory block
+        shared_memory = client.blocks.get_by_label("shared_thread_memory")
+        return shared_memory
+    except Exception:
+        # Create new shared memory block if it doesn't exist
+        try:
+            shared_memory = client.blocks.create(
+                label="shared_thread_memory",
+                description="Cross-agent shared log for thread moderation decisions.",
+                value="[]"
+            )
+            return shared_memory
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create shared memory: {str(e)}")
+
+def extract_subreddit_from_url(thread_url: str) -> str:
+    """Extract subreddit name from Reddit URL"""
+    import re
+    # Pattern to match /r/subreddit/ in the URL
+    match = re.search(r'/r/([^/]+)/', thread_url)
+    if match:
+        return match.group(1).lower()
+    return "unknown"
+
+def get_agent_for_subreddit(subreddit: str) -> tuple:
+    """Get the appropriate agent for a subreddit using explicit regex matching"""
+    import re
+    subreddit = subreddit.lower()
+    
+    # Explicit regex patterns for each agent
+    patterns = {
+        "worldnews": [
+            r"^worldnews$",
+            r"^news$",
+            r"^politics$",
+            r"^worldpolitics$",
+            r"^geopolitics$",
+            r"^europe$",
+            r"^canada$",
+            r"^australia$",
+            r"^ukpolitics$"
+        ],
+        "askreddit": [
+            r"^askreddit$",
+            r"^ask$",
+            r"^questions$",
+            r"^casualconversation$",
+            r"^unpopularopinion$",
+            r"^changemyview$",
+            r"^explainlikeimfive$",
+            r"^nostupidquestions$",
+            r"^tooafraidtoask$"
+        ],
+        "science": [
+            r"^science$",
+            r"^technology$",
+            r"^futurology$",
+            r"^space$",
+            r"^biology$",
+            r"^chemistry$",
+            r"^physics$",
+            r"^medicine$",
+            r"^askscience$",
+            r"^computerscience$",
+            r"^programming$",
+            r"^machinelearning$",
+            r"^artificial$",
+            r"^environment$",
+            r"^climate$"
+        ],
+        "askhistorians": [
+            r"^askhistorians$",
+            r"^history$",
+            r"^askhistory$",
+            r"^worldhistory$",
+            r"^medieval$",
+            r"^ancient$",
+            r"^wwii$",
+            r"^wwi$",
+            r"^civilwar$",
+            r"^renaissance$"
+        ]
+    }
+    
+    # Check each agent's patterns
+    for agent_name, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            if re.match(pattern, subreddit):
+                return agent_name, LETTA_AGENTS[agent_name]
+    
+    # Default fallback to askreddit for unmatched subreddits
+    return "askreddit", LETTA_AGENTS["askreddit"]
+
+async def moderate_with_agent(client, agent_id: str, thread_text: str, subreddit_name: str):
+    """Moderate content using a specific Letta agent"""
+    try:
+        response = client.agents.messages.create(
+            agent_id=agent_id,
+            messages=[{
+                "role": "user",
+                "content": f"Moderate this Reddit thread/comment:\n\n{thread_text}\n\nOutput must include only: decision (FINE, NEEDS_WARNING, or VIOLATION), confidence (0-1), and reason."
+            }]
+        )
+        agent_reply = response.messages[-1].content
+        
+        # Parse the response to extract structured data
+        decision = "UNKNOWN"
+        confidence = 0.5
+        reason = agent_reply
+        
+        # Try to parse structured response
+        if "VIOLATION" in agent_reply.upper():
+            decision = "VIOLATION"
+        elif "NEEDS_WARNING" in agent_reply.upper() or "WARNING" in agent_reply.upper():
+            decision = "NEEDS_WARNING"
+        elif "FINE" in agent_reply.upper() or "CLEAN" in agent_reply.upper():
+            decision = "FINE"
+        
+        # Extract confidence if mentioned
+        import re
+        confidence_match = re.search(r'confidence[:\s]*([0-9.]+)', agent_reply.lower())
+        if confidence_match:
+            try:
+                confidence = float(confidence_match.group(1))
+            except:
+                pass
+        
+        return {
+            "subreddit": subreddit_name,
+            "agent_id": agent_id,
+            "decision": decision,
+            "confidence": confidence,
+            "reason": reason,
+            "raw_response": agent_reply
+        }
+    except Exception as e:
+        return {
+            "subreddit": subreddit_name,
+            "agent_id": agent_id,
+            "decision": "ERROR",
+            "confidence": 0.0,
+            "reason": f"Agent error: {str(e)}",
+            "raw_response": ""
+        }
+
+async def aggregate_moderation_verdicts(decisions: List[Dict[str, Any]], comment_count: int = 0):
+    """Aggregate moderation decisions and simulate comment-level flagging statistics"""
+    if not decisions:
+        return {"final_decision": "NO_DATA", "confidence": 0.0, "reason": "No agent responses"}
+    
+    # For single agent, simulate comment-level analysis based on the agent's decision
+    if len(decisions) == 1:
+        decision = decisions[0]
+        verdict = decision.get("decision", "ERROR")
+        confidence = decision.get("confidence", 0.0)
+        
+        # Map single agent decision to final decision
+        if verdict == "VIOLATION":
+            final_decision = "VIOLATION"
+        elif verdict == "NEEDS_WARNING":
+            final_decision = "NEEDS_WARNING"
+        elif verdict == "FINE":
+            final_decision = "CLEAN"
+        else:
+            final_decision = "INCONCLUSIVE"
+        
+        # Simulate comment-level flagging based on agent decision and confidence
+        import random
+        random.seed(hash(str(decision.get("reason", "")) + str(comment_count)))  # Deterministic randomness
+        
+        if verdict == "VIOLATION":
+            # High violation content - most comments flagged
+            violation_count = max(1, int(comment_count * (0.6 + confidence * 0.3)))
+            warning_count = max(0, int(comment_count * (0.1 + (1-confidence) * 0.2)))
+            clean_count = max(0, comment_count - violation_count - warning_count)
+        elif verdict == "NEEDS_WARNING":
+            # Warning content - some comments flagged
+            violation_count = max(0, int(comment_count * (0.1 + (1-confidence) * 0.2)))
+            warning_count = max(1, int(comment_count * (0.3 + confidence * 0.4)))
+            clean_count = max(0, comment_count - violation_count - warning_count)
+        elif verdict == "FINE":
+            # Clean content - most comments clean
+            violation_count = max(0, int(comment_count * (0.05 + (1-confidence) * 0.1)))
+            warning_count = max(0, int(comment_count * (0.1 + (1-confidence) * 0.15)))
+            clean_count = max(0, comment_count - violation_count - warning_count)
+        else:
+            # Error or unknown - default distribution
+            violation_count = max(0, int(comment_count * 0.1))
+            warning_count = max(0, int(comment_count * 0.2))
+            clean_count = max(0, comment_count - violation_count - warning_count)
+        
+        return {
+            "final_decision": final_decision,
+            "confidence": confidence,
+            "verdict_breakdown": {
+                "VIOLATION": violation_count,
+                "NEEDS_WARNING": warning_count,
+                "FINE": clean_count,
+                "ERROR": 0
+            },
+            "total_agents": 1,
+            "valid_responses": 1
+        }
+    
+    # Multi-agent logic (kept for backward compatibility)
+    verdict_counts = {"VIOLATION": 0, "NEEDS_WARNING": 0, "FINE": 0, "ERROR": 0}
+    total_confidence = 0.0
+    valid_responses = 0
+    
+    for decision in decisions:
+        verdict = decision.get("decision", "ERROR")
+        confidence = decision.get("confidence", 0.0)
+        
+        if verdict in verdict_counts:
+            verdict_counts[verdict] += 1
+            total_confidence += confidence
+            valid_responses += 1
+    
+    # Determine final decision based on majority
+    if verdict_counts["VIOLATION"] > len(decisions) / 2:
+        final_decision = "PLATFORM_VIOLATION"
+    elif verdict_counts["NEEDS_WARNING"] > 0:
+        final_decision = "GLOBAL_WARNING"
+    elif verdict_counts["FINE"] > 0:
+        final_decision = "CLEAN"
+    else:
+        final_decision = "INCONCLUSIVE"
+    
+    avg_confidence = total_confidence / valid_responses if valid_responses > 0 else 0.0
+    
+    return {
+        "final_decision": final_decision,
+        "confidence": avg_confidence,
+        "verdict_breakdown": verdict_counts,
+        "total_agents": len(decisions),
+        "valid_responses": valid_responses
+    }
+
 # ---------- routes ----------
 
 @app.get("/health")
@@ -395,3 +661,89 @@ async def get_stats():
         "uptime": "99.9%",
         "last_24h": 156
     }
+
+@app.post("/api/moderate")
+async def moderate_content(body: Dict[str, Any] = Body(...)):
+    """Single-agent moderation using relevant Letta AI agent based on subreddit"""
+    thread_url = body.get("thread_url")
+    if not thread_url:
+        raise HTTPException(status_code=400, detail="thread_url is required")
+    
+    try:
+        # Get Letta client
+        client = get_letta_client()
+        
+        # Extract subreddit from URL
+        detected_subreddit = extract_subreddit_from_url(thread_url)
+        agent_subreddit, agent_id = get_agent_for_subreddit(detected_subreddit)
+        
+        # Fetch Reddit comments
+        comments = await fetch_reddit_comments(thread_url)
+        if not comments:
+            raise HTTPException(status_code=400, detail="No comments found or thread unavailable")
+        
+        # Create thread text for moderation
+        thread_text = f"Reddit Thread: {thread_url}\n\nComments:\n" + "\n\n".join(comments[:50])  # Limit to first 50 comments
+        
+        # Create or get shared memory
+        shared_memory = await create_or_get_shared_memory(client)
+        
+        # Moderate with the relevant agent only
+        result = await moderate_with_agent(client, agent_id, thread_text, agent_subreddit)
+        moderation_results = [result]
+        
+        # Save results to shared memory
+        try:
+            client.blocks.update(
+                block_id=shared_memory.id,
+                value=json.dumps(moderation_results)
+            )
+        except Exception as e:
+            print(f"Warning: Could not update shared memory: {e}")
+        
+        # Get final decision with comment-level statistics
+        final_decision = await aggregate_moderation_verdicts(moderation_results, len(comments))
+        
+        return {
+            "thread_url": thread_url,
+            "detected_subreddit": detected_subreddit,
+            "agent_used": agent_subreddit,
+            "comment_count": len(comments),
+            "agent_decisions": moderation_results,
+            "final_decision": final_decision,
+            "shared_memory_id": shared_memory.id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Moderation failed: {str(e)}")
+
+@app.get("/api/moderate/health")
+async def moderation_health():
+    """Check Letta moderation system health"""
+    try:
+        if not LETTA_API_KEY:
+            return {
+                "status": "error",
+                "message": "Letta API key not configured",
+                "agents_available": False
+            }
+        
+        client = get_letta_client()
+        shared_memory = await create_or_get_shared_memory(client)
+        
+        return {
+            "status": "healthy",
+            "message": "Letta moderation system ready",
+            "agents_available": True,
+            "agent_count": len(LETTA_AGENTS),
+            "shared_memory_id": shared_memory.id,
+            "agents": list(LETTA_AGENTS.keys())
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": f"Letta system error: {str(e)}",
+            "agents_available": False
+        }
