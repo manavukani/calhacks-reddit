@@ -91,20 +91,11 @@ export default function History() {
               </div>
             </div>
             <div className="flex gap-2">
-              {backUrl ? (
+              {backUrl && (
                 <a href={backUrl} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-full transition font-semibold flex items-center gap-1">
                   <ArrowLeft className="w-4 h-4" />
                   Back to Thread
                 </a>
-              ) : (
-                <>
-                  <a href="/" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
-                    Simple View
-                  </a>
-                  <a href="/compare" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
-                    Compare
-                  </a>
-                </>
               )}
             </div>
           </div>

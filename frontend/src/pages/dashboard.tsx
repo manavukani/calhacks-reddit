@@ -16,12 +16,25 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [count, setCount] = useState(0);
   const [error, setError] = useState<string>("");
+
   const [backUrl, setBackUrl] = useState<string>("");
   
   // Moderation state
   const [moderationLoading, setModerationLoading] = useState(false);
   const [moderationResult, setModerationResult] = useState<any>(null);
   const [moderationError, setModerationError] = useState<string>("");
+
+  // Auto-fill URL from query parameter and store back URL
+  useEffect(() => {
+    if (router.isReady && router.query.url) {
+      const urlParam = router.query.url as string;
+      setUrl(urlParam);
+    }
+    if (router.isReady && router.query.from) {
+      const fromParam = router.query.from as string;
+      setBackUrl(fromParam);
+    }
+  }, [router.isReady, router.query.url, router.query.from]);
 
   // Auto-fill URL from query parameter and store back URL
   useEffect(() => {
@@ -172,20 +185,11 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex gap-2">
-              {backUrl ? (
+              {backUrl && (
                 <a href={backUrl} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-full transition font-semibold flex items-center gap-1">
                   <ArrowLeft className="w-4 h-4" />
                   Back to Thread
                 </a>
-              ) : (
-                <>
-                  <a href="/" className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold">
-                    Simple View
-                  </a>
-                  <a href="/compare" className="px-4 py-2 text-sm bg-[#FF4500] text-white rounded-full hover:bg-[#ff5722] transition font-semibold">
-                    Compare
-                  </a>
-                </>
               )}
               <a href={backUrl ? `/history?from=${encodeURIComponent(backUrl)}` : '/history'} className="px-4 py-2 text-sm text-[#FF4500] border border-[#FF4500] rounded-full hover:bg-orange-50 transition font-semibold flex items-center gap-1">
                 <Clock className="w-4 h-4" />
